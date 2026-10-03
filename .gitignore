@@ -35,5 +35,8 @@ build/
 ### VS Code ###
 .vscode/
 
+### 本地配置（含密钥，勿提交）###
+config.properties
+
 ### Mac OS ###
 .DS_Store
