@@ -61,10 +61,13 @@ public final class Repl {
         return true;
     }
 
-    /** 执行一轮任务；失败只报错，不退出循环。 */
+    /** 执行一轮任务；回答前加空行和分隔横幅，与上方工具过程日志区分；失败只报错，不退出循环。 */
     private void runTask(String input) {
         try {
-            System.out.println(agent.runTurn(input));
+            String answer = agent.runTurn(input);
+            System.out.println();
+            System.out.println(Ansi.dim("  ── 回答 ──────────────"));
+            System.out.println(answer);
         } catch (Exception e) {
             System.out.println(Ansi.red("[LLM 调用失败] ") + (e.getMessage() != null ? e.getMessage() : e));
         }

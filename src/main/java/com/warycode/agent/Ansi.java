@@ -1,7 +1,7 @@
 package com.warycode.agent;
 
 /**
- * 终端着色：蓝→青绿 truecolor 渐变与少量修饰色，供启动横幅和 REPL 提示共用。
+ * 终端着色：蓝→青绿 truecolor 渐变与少量修饰色，供启动横幅、REPL 提示、工具日志和回答分隔线共用。
  * 设置环境变量 NO_COLOR 可整体关闭（输出重定向到文件时拿干净文本）。
  */
 public final class Ansi {

@@ -2,6 +2,7 @@ package com.warycode.agent.tools;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.warycode.agent.Ansi;
 import com.warycode.agent.llm.model.ToolCall;
 
 import java.util.Map;
@@ -43,14 +44,14 @@ public final class ToolExecutor {
         if (argsPreview.length() > 120) {
             argsPreview = argsPreview.substring(0, 120) + "…";
         }
-        System.out.println("  → " + call.name() + " " + argsPreview);
+        System.out.println("  " + Ansi.dim("→ ") + Ansi.teal(call.name()) + " " + Ansi.dim(argsPreview));
 
         // 第 2 步：按名字从注册表找工具。找不到不抛异常，
         // 而是把可用工具清单告诉模型，让它换个名字重试
         Tool tool = registry.find(call.name());
         if (tool == null) {
             String msg = "未知工具 " + call.name() + "，可用工具: " + registry.names();
-            System.out.println("  ✗ " + msg);
+            System.out.println("  " + Ansi.red("✗ " + msg));
             return new ToolResult(true, msg);
         }
 
@@ -90,9 +91,9 @@ public final class ToolExecutor {
             resultPreview = resultPreview.substring(0, 120) + "…";
         }
         if (isError) {
-            System.out.println("  ✗ " + resultPreview);
+            System.out.println("  " + Ansi.red("✗ " + resultPreview));
         } else {
-            System.out.println("  ✓ " + resultPreview);
+            System.out.println("  " + Ansi.dim("✓ " + resultPreview));
         }
         return new ToolResult(isError, output);
     }
