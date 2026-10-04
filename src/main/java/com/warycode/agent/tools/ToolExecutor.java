@@ -44,9 +44,7 @@ public final class ToolExecutor {
             String output = future.get(tool.timeoutSeconds(), TimeUnit.SECONDS);
             return done(ToolResult.ok(truncate(output)));
         } catch (TimeoutException e) {
-            if (future != null) {
-                future.cancel(true);   // 中断虚拟线程，尽快释放
-            }
+            future.cancel(true);   // 中断虚拟线程，尽快释放
             return done(ToolResult.error("执行超时(" + tool.timeoutSeconds() + "s)已中断"));
         } catch (Exception e) {
             return done(ToolResult.error(rootMessage(e)));

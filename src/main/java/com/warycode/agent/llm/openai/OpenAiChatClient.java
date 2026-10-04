@@ -45,7 +45,7 @@ public final class OpenAiChatClient implements ChatClient {
         request.tools().forEach(t -> builder.addTool(toSdkTool(t)));
 
         ChatCompletion completion = client.chat().completions().create(builder.build());
-        ChatCompletion.Choice choice = completion.choices().get(0);
+        ChatCompletion.Choice choice = completion.choices().getFirst();
         ChatCompletionMessage message = choice.message();
 
         List<ToolCall> toolCalls = message.toolCalls().orElse(List.of()).stream()
