@@ -53,7 +53,6 @@ public final class ToolExecutor {
         String output;
         try {
             Map<String, Object> args = JSON.readValue(call.argumentsJson(), ARGS_TYPE);
-            // Execute in a separate thread to support interruption on timeout; ExecutionException restored to the original exception
             long budget = tool.timeoutSeconds(args);
             Future<String> future = runner.submit(() -> tool.execute(args));
             try {
