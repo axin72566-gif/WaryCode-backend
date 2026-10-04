@@ -10,12 +10,14 @@ import com.warycode.agent.llm.model.SystemMessage;
 import com.warycode.agent.llm.model.ToolCall;
 import com.warycode.agent.llm.model.ToolMessage;
 import com.warycode.agent.llm.model.UserMessage;
+import com.warycode.agent.skill.SkillRegistry;
 import com.warycode.agent.tools.ToolExecutor;
 import com.warycode.agent.tools.ToolRegistry;
 import com.warycode.agent.tools.ToolResult;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 核心循环：LLM ↔ 工具 的调度中枢。
@@ -30,13 +32,16 @@ public final class CodingAgent {
     private final ToolExecutor executor;
     private final ToolRegistry registry;
     private final AgentConfig config;
+    private final SkillRegistry skillRegistry;
     private final List<ChatMessage> history = new ArrayList<>();
 
-    public CodingAgent(ChatClient chatClient, ToolRegistry registry, ToolExecutor executor, AgentConfig config) {
+    public CodingAgent(ChatClient chatClient, ToolRegistry registry, ToolExecutor executor, AgentConfig config,
+                       SkillRegistry skillRegistry) {
         this.chatClient = chatClient;
         this.registry = registry;
         this.executor = executor;
         this.config = config;
+        this.skillRegistry = skillRegistry;
     }
 
     /** 执行一轮用户输入：有工具调用则执行回填继续，无则返回文本收尾。 */
@@ -68,8 +73,9 @@ public final class CodingAgent {
         history.clear();
     }
 
+    /** 系统提示词：基础段直接拼上技能清单（无技能时省略技能段）。 */
     private String systemPrompt() {
-        return """
+        String base = """
                 你是运行在用户本机的编码 agent。工作目录: %s（只能访问其中文件）。
                 工具使用准则:
                 1) 修改文件前先 readFile 看内容;
@@ -79,5 +85,13 @@ public final class CodingAgent {
                 5) 大文件用 offset/limit 分段读取;
                 6) 任务完成后简述你做了哪些改动。
                 """.formatted(config.workspace());
+        if (skillRegistry.isEmpty()) {
+            return base;
+        }
+        String skills = "可用技能（任务匹配下方描述时，先调用 skill 工具加载完整指引，再按指引执行）:\n"
+                + skillRegistry.all().stream()
+                .map(skill -> "- " + skill.name() + ": " + skill.description())
+                .collect(Collectors.joining("\n"));
+        return base + "\n\n" + skills;
     }
 }
