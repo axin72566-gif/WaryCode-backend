@@ -27,10 +27,13 @@ public final class EditFileTool extends WorkspaceTool implements Tool {
 
     @Override
     public Map<String, Object> schema() {
-        return objectSchema(List.of("path", "old_string", "new_string"),
-                "path", "string", "相对工作目录的文件路径",
-                "old_string", "string", "被替换的原文(须唯一)",
-                "new_string", "string", "替换后的新文本");
+        return Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        "path", Map.of("type", "string", "description", "相对工作目录的文件路径"),
+                        "old_string", Map.of("type", "string", "description", "被替换的原文(须唯一)"),
+                        "new_string", Map.of("type", "string", "description", "替换后的新文本")),
+                "required", List.of("path", "old_string", "new_string"));
     }
 
     @Override

@@ -6,14 +6,16 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 /** glob：按模式查找文件名，修改时间倒序（最新改动优先），限 200 条。 */
 public final class GlobTool extends WorkspaceTool implements Tool {
 
     private static final int MAX_RESULTS = 200;
-    private static final int MAX_DEPTH = 8;
+    private static final int MAX_DEPTH = 16;
 
     public GlobTool(Path workspace) {
         super(workspace);
@@ -31,9 +33,12 @@ public final class GlobTool extends WorkspaceTool implements Tool {
 
     @Override
     public Map<String, Object> schema() {
-        return objectSchema(List.of("pattern"),
-                "pattern", "string", "glob 模式",
-                "path", "string", "起始子目录, 默认为根");
+        return Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        "pattern", Map.of("type", "string", "description", "glob 模式"),
+                        "path", Map.of("type", "string", "description", "起始子目录, 默认为根")),
+                "required", List.of("pattern"));
     }
 
     @Override
@@ -41,23 +46,40 @@ public final class GlobTool extends WorkspaceTool implements Tool {
         Path base = resolve(args.containsKey("path") ? arg(args, "path") : ".");
         PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + arg(args, "pattern"));
 
-        List<String> matches;
-        try (var stream = Files.walk(base, MAX_DEPTH)) {
-            matches = stream.filter(Files::isRegularFile)
-                    .map(f -> Map.entry(f, workspace.relativize(f)))
-                    .filter(e -> !ignored(e.getValue()))
-                    .filter(e -> matcher.matches(e.getValue()))
-                    .sorted((a, b) -> Long.compare(mtime(b.getKey()), mtime(a.getKey())))
-                    .limit(MAX_RESULTS)
-                    .map(e -> e.getValue().toString())
-                    .toList();
+        // 第一步：遍历目录，收集匹配的文件（绝对路径）
+        List<Path> matches = new ArrayList<>();
+        try (Stream<Path> stream = Files.walk(base, MAX_DEPTH)) {
+            for (Path file : stream.toList()) {
+                if (!Files.isRegularFile(file)) {
+                    continue;
+                }
+                Path relative = workspace.relativize(file);
+                if (isIgnored(relative)) {
+                    continue;
+                }
+                if (matcher.matches(relative)) {
+                    matches.add(file);
+                }
+            }
         }
-        return matches.isEmpty()
-                ? "无匹配文件"
-                : "匹配 " + matches.size() + " 个:\n" + String.join("\n", matches);
+
+        // 第二步：按修改时间倒序（最新改动优先），超过上限只保留前 MAX_RESULTS 个
+        matches.sort((a, b) -> Long.compare(lastModifiedTime(b), lastModifiedTime(a)));
+        if (matches.size() > MAX_RESULTS) {
+            matches = matches.subList(0, MAX_RESULTS);
+        }
+
+        if (matches.isEmpty()) {
+            return "无匹配文件";
+        }
+        StringBuilder sb = new StringBuilder("匹配 " + matches.size() + " 个:\n");
+        for (Path file : matches) {
+            sb.append(workspace.relativize(file)).append('\n');
+        }
+        return sb.toString();
     }
 
-    private static long mtime(Path file) {
+    private static long lastModifiedTime(Path file) {
         try {
             return Files.getLastModifiedTime(file).toMillis();
         } catch (Exception e) {

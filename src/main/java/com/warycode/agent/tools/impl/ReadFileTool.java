@@ -29,10 +29,13 @@ public final class ReadFileTool extends WorkspaceTool implements Tool {
 
     @Override
     public Map<String, Object> schema() {
-        return objectSchema(List.of("path"),
-                "path", "string", "相对工作目录的文件路径",
-                "offset", "integer", "起始行号(1 起,含)",
-                "limit", "integer", "读取行数");
+        return Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        "path", Map.of("type", "string", "description", "相对工作目录的文件路径"),
+                        "offset", Map.of("type", "integer", "description", "起始行号(1 起,含)"),
+                        "limit", Map.of("type", "integer", "description", "读取行数")),
+                "required", List.of("path"));
     }
 
     @Override
@@ -47,7 +50,7 @@ public final class ReadFileTool extends WorkspaceTool implements Tool {
         if (from > lines.size()) {
             return "(文件共 " + lines.size() + " 行, offset " + from + " 超出范围)";
         }
-        int limit = argInt(args, "limit", Integer.MAX_VALUE / 2);
+        int limit = argInt(args, "limit", lines.size());
         int to = Math.min(lines.size(), from - 1 + limit);
 
         StringBuilder sb = new StringBuilder("(共 " + lines.size() + " 行, 显示 " + from + "-" + to + ")\n");

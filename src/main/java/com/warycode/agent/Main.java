@@ -6,59 +6,34 @@ import com.warycode.agent.llm.openai.OpenAiChatClient;
 import com.warycode.agent.tools.ToolExecutor;
 import com.warycode.agent.tools.ToolRegistry;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 
 /**
- * 入口：装配所有组件 + REPL 循环。
- * LLM 调用失败只打断当前轮，历史保留可直接重试。
+ * 入口：只做组件装配和启动，交互循环在 Repl。
  */
 public final class Main {
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws IOException {
         AgentConfig config = AgentConfig.load();
         ChatClient chatClient = new OpenAiChatClient(config.apiKey(), config.baseUrl());
-        ToolRegistry registry = ToolRegistry.withDefaults(config.workspace());
+        ToolRegistry registry = ToolRegistry.of(config.workspace());
         ToolExecutor executor = new ToolExecutor(registry);
         CodingAgent agent = new CodingAgent(chatClient, registry, executor, config);
 
-        System.out.println("WaryCode Agent | model=" + config.model() + " | workspace=" + config.workspace());
-        System.out.println("输入任务开始; /help 查看命令");
+        System.out.print(Ansi.gradient("""
+                ██╗    ██╗ █████╗ ██████╗ ██╗   ██╗ ██████╗ ██████╗ ██╗   ██╗ █████╗
+                ██║    ██║██╔══██╗██╔══██╗██║   ██║██╔════╝██╔═══██╗██║   ██║██╔══██╗
+                ██║ █╗ ██║███████║██████╔╝███████║ █████╗  ██║   ██║██║   ██║██████╔╝
+                ██║███╗██║██╔══██║██╔══██╗╚════██║ ██╔══╝  ██║   ██║██║   ██║██╔══██╗
+                ╚███╔███╔╝██║  ██║██║  ██║     ██║ ███████╗╚██████╔╝╚██████╔╝██║  ██║
+                 ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝  ╚═╝     ╚═╝ ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝
+                """));
+        System.out.println();
+        System.out.printf("  %s %s%n", Ansi.dim(String.format("%-10s", "model")), config.model());
+        System.out.printf("  %s %s%n", Ansi.dim(String.format("%-10s", "workspace")), config.workspace());
+        System.out.println();
+        System.out.println(Ansi.dim("  输入任务开始; /help 查看命令"));
 
-        BufferedReader in = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
-        while (true) {
-            System.out.print("\n> ");
-            System.out.flush();
-            String line = in.readLine();
-            if (line == null) {
-                break;
-            }
-            line = line.trim();
-            if (line.isEmpty()) {
-                continue;
-            }
-            switch (line) {
-                case "/exit", "/quit" -> {
-                    return;
-                }
-                case "/clear" -> {
-                    agent.clear();
-                    System.out.println("(已清空对话)");
-                    continue;
-                }
-                case "/help" -> {
-                    System.out.println("/exit /quit 退出 | /clear 清空对话");
-                    continue;
-                }
-                default -> {
-                }
-            }
-            try {
-                System.out.println(agent.run(line));
-            } catch (Exception e) {
-                System.out.println("[LLM 调用失败] " + (e.getMessage() != null ? e.getMessage() : e));
-            }
-        }
+        new Repl(agent).run();
     }
 }

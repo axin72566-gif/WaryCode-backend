@@ -40,7 +40,7 @@ public final class CodingAgent {
     }
 
     /** 执行一轮用户输入：有工具调用则执行回填继续，无则返回文本收尾。 */
-    public String run(String userInput) {
+    public String runTurn(String userInput) {
         if (history.isEmpty()) {
             history.add(new SystemMessage(systemPrompt()));
         }

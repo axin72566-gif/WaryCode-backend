@@ -27,9 +27,12 @@ public final class WriteFileTool extends WorkspaceTool implements Tool {
 
     @Override
     public Map<String, Object> schema() {
-        return objectSchema(List.of("path", "content"),
-                "path", "string", "相对工作目录的文件路径",
-                "content", "string", "完整文件内容");
+        return Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        "path", Map.of("type", "string", "description", "相对工作目录的文件路径"),
+                        "content", Map.of("type", "string", "description", "完整文件内容")),
+                "required", List.of("path", "content"));
     }
 
     @Override

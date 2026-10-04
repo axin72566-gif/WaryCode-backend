@@ -12,7 +12,6 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * 注册中心：只管工具的生命周期与发现，不做任何执行。
@@ -31,8 +30,9 @@ public final class ToolRegistry {
         return this;
     }
 
-    public Optional<Tool> byName(String name) {
-        return Optional.ofNullable(tools.get(name));
+    /** 按名字查工具，找不到返回 null。 */
+    public Tool find(String name) {
+        return tools.get(name);
     }
 
     public List<String> names() {
@@ -47,7 +47,7 @@ public final class ToolRegistry {
     }
 
     /** 内置六工具的组装收敛点。 */
-    public static ToolRegistry withDefaults(Path workspace) {
+    public static ToolRegistry of(Path workspace) {
         return new ToolRegistry()
                 .register(new ReadFileTool(workspace))
                 .register(new WriteFileTool(workspace))

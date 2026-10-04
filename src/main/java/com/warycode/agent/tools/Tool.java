@@ -4,7 +4,7 @@ import java.util.Map;
 
 /**
  * 工具契约：实现者只关心"做什么"（业务逻辑），
- * 超时/异常兜底/截断/日志等横切关注由 ToolExecutor 统一提供。
+ * 异常兜底/截断/超时/日志等横切关注由 ToolExecutor 统一提供。
  */
 public interface Tool {
 
@@ -20,8 +20,9 @@ public interface Tool {
     /** 执行工具并返回文本结果；异常是框架要处理的正常输入，不是事故。 */
     String execute(Map<String, Object> args) throws Exception;
 
-    /** 执行器统一超时上限（秒），可按工具覆写。 */
-    default int timeoutSeconds() {
-        return 120;
+    /** 声明本次调用的执行预算(秒)，由 ToolExecutor 到点中断并回报模型；默认 60。
+     *  中断是协作式的：Process.waitFor 会立刻响应，Files.* 不响应的工具会在后台跑完但结果被丢弃。 */
+    default long timeoutSeconds(Map<String, Object> args) {
+        return 60;
     }
 }

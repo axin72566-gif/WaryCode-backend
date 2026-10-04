@@ -1,17 +1,22 @@
 package com.warycode.agent.tools.impl;
 
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * 文件类工具的公共底座：沙箱校验、遍历剪枝、宽容取参、schema 快捷构造。
+ * 文件类工具的公共底座，只管"运行时"的公共事务。子类 execute() 的典型流程：
+ *   Path p = resolve(arg(args, "path"));   // 取参 + 沙箱校验，得到工作目录内的绝对路径
+ *   ...用 p 读文件 / 写文件 / 遍历...
+ * 三组能力，按流程顺序：
+ * 1. 取参   arg / argInt     从模型给的参数表取值，容忍类型漂移（数字被输出成字符串）
+ * 2. 沙箱   resolve          把路径关进 workspace，拒绝 ../ 逃逸和外部绝对路径
+ * 3. 剪枝   isIgnored        glob/grep 遍历目录时跳过 .git/target/node_modules/.idea
  */
 abstract class WorkspaceTool {
 
-    static final Set<String> IGNORED = Set.of(".git", "target", "node_modules", ".idea");
+    /** 遍历时跳过的目录：版本库、构建产物、依赖目录。 */
+    private static final Set<String> IGNORED = Set.of(".git", "target", "node_modules", ".idea");
 
     protected final Path workspace;
 
@@ -19,41 +24,7 @@ abstract class WorkspaceTool {
         this.workspace = workspace;
     }
 
-    /** 沙箱校验：归一化后必须仍落在 workspace 内，拒绝 .. 逃逸与外部绝对路径。 */
-    protected Path resolve(String raw) {
-        Path p = workspace.resolve(raw).normalize();
-        if (!p.startsWith(workspace)) {
-            throw new IllegalArgumentException("路径越界(仅允许工作目录内): " + raw);
-        }
-        return p;
-    }
-
-    /** 遍历剪枝：跳过版本库/构建产物目录。 */
-    protected boolean ignored(Path relative) {
-        for (Path seg : relative) {
-            if (IGNORED.contains(seg.toString())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** schema 快捷构造：required + ("参数名","类型","说明") 三元组序列。 */
-    protected static Map<String, Object> objectSchema(List<String> required, Object... triples) {
-        Map<String, Object> props = new LinkedHashMap<>();
-        for (int i = 0; i < triples.length; i += 3) {
-            props.put((String) triples[i], Map.of(
-                    "type", triples[i + 1],
-                    "description", triples[i + 2]));
-        }
-        Map<String, Object> schema = new LinkedHashMap<>();
-        schema.put("type", "object");
-        schema.put("properties", props);
-        schema.put("required", required);
-        return schema;
-    }
-
-    /** 宽容取参：模型输出类型可能漂移（数字给成字符串），统一 toString；缺参报清晰错误。 */
+    /** 取必填字符串参数；缺失时抛错，错误信息经 ToolExecutor 转给模型让它重试。 */
     protected static String arg(Map<String, Object> args, String key) {
         Object v = args.get(key);
         if (v == null) {
@@ -62,8 +33,31 @@ abstract class WorkspaceTool {
         return String.valueOf(v);
     }
 
-    protected static Integer argInt(Map<String, Object> args, String key, Integer def) {
+    /** 取可选整数参数，没传就用默认值；模型可能把数字输出成字符串，统一转一下。 */
+    protected static int argInt(Map<String, Object> args, String key, int def) {
         Object v = args.get(key);
-        return v == null ? def : Integer.valueOf(String.valueOf(v).trim());
+        if (v == null) {
+            return def;
+        }
+        return Integer.parseInt(String.valueOf(v).trim());
+    }
+
+    /** 沙箱校验：解析成绝对路径并归一化，必须仍落在 workspace 内，否则报错。 */
+    protected Path resolve(String raw) {
+        Path p = workspace.resolve(raw).normalize();
+        if (!p.startsWith(workspace)) {
+            throw new IllegalArgumentException("路径越界(仅允许工作目录内): " + raw);
+        }
+        return p;
+    }
+
+    /** 相对路径中任一段命中忽略目录即返回 true，供 glob/grep 遍历时跳过。 */
+    protected boolean isIgnored(Path relative) {
+        for (Path seg : relative) {
+            if (IGNORED.contains(seg.toString())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
