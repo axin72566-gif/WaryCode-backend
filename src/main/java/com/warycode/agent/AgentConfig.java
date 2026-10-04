@@ -6,11 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
 
-/**
- * 配置加载：从 config.properties 读取。
- * 开发阶段约定配置完整可用，只读取不校验；workspace 归一化为绝对路径，
- * 是文件工具沙箱校验的基准。
- */
+/** 配置，从 config.properties 读取。workspace 归一化为绝对路径，作为文件工具沙箱基准。 */
 public record AgentConfig(String apiKey, String baseUrl, String model, Path workspace) {
 
     private static final Path FILE = Path.of("config.properties");

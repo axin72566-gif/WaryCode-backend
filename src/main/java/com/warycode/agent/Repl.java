@@ -11,9 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
- * 命令行交互循环（REPL）：读一行输入——
- * 以 / 开头交给 handleCommand 分发，否则当作任务交给 agent 执行。
- * LLM 调用失败只打断当前轮，历史保留可直接重试。
+ * 命令行交互循环：/ 开头的行按命令分发，其余作为任务交给 agent。
+ * LLM 调用失败只报错不退出，历史保留可重试。
  */
 public final class Repl {
 
@@ -25,7 +24,7 @@ public final class Repl {
         this.skills = skills;
     }
 
-    /** 主循环：输入流结束（Ctrl+D / Ctrl+Z）或 /exit 命令时退出。 */
+    /** 主循环，输入流结束或 /exit 时退出。 */
     public void run() throws IOException {
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
         while (true) {
@@ -50,7 +49,7 @@ public final class Repl {
         }
     }
 
-    /** 命令分发：先统一切出命令词与参数，再一个 case 一个命令；返回 false 表示退出程序。 */
+    /** 分发命令，返回 false 表示退出程序。 */
     private boolean handleCommand(String line) {
         int space = line.indexOf(' ');
         String command = space < 0 ? line : line.substring(0, space);
@@ -70,7 +69,7 @@ public final class Repl {
         return true;
     }
 
-    /** /skill 命令：无参列出技能清单；带名查技能并执行，名后可附补充说明。 */
+    /** /skill：无参列出技能清单；带名执行技能，名后可附补充说明。 */
     private void handleSkill(String rest) {
         if (rest.isEmpty()) {
             if (skills.isEmpty()) {
@@ -95,7 +94,7 @@ public final class Repl {
         runTask(extra.isEmpty() ? task : task + "\n\n" + extra);
     }
 
-    /** 执行一轮任务；回答前加空行和分隔横幅，与上方工具过程日志区分；失败只报错，不退出循环。 */
+    /** 执行任务并打印回答；失败只报错不退出。 */
     private void runTask(String input) {
         try {
             String answer = agent.runTurn(input);

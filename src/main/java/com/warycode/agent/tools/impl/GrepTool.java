@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-/** grep：正则搜索文件内容，输出 路径:行号: 内容，限 100 条，二进制/编码异常文件静默跳过。 */
+/** grep：正则搜索文件内容，输出 路径:行号: 内容，限 100 条。 */
 public final class GrepTool extends WorkspaceTool implements Tool {
 
     private static final int MAX_HITS = 100;
@@ -87,7 +87,7 @@ public final class GrepTool extends WorkspaceTool implements Tool {
         return sb.toString();
     }
 
-    /** 逐行扫描单个文件，命中行写入 sb，返回新的累计命中数；二进制/非 UTF-8 文件静默跳过。 */
+    /** 扫描单文件，命中行写入 sb，返回累计命中数；二进制/非 UTF-8 文件跳过。 */
     private int scanFile(Path file, Path relative, Pattern regex, StringBuilder sb, int hits, int maxHits) {
         try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             int lineNo = 0;
@@ -100,7 +100,6 @@ public final class GrepTool extends WorkspaceTool implements Tool {
                 }
             }
         } catch (Exception ignored) {
-            // 二进制或非 UTF-8 文件：跳过
         }
         return hits;
     }

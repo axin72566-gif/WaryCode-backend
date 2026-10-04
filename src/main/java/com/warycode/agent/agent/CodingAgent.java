@@ -19,11 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * 核心循环：LLM ↔ 工具 的调度中枢。
- * 转换在适配层、管道在执行器、发现靠注册中心，这里只剩纯调度。
- * 工具异常已在执行器兜底；LLM 调用异常向上抛给 REPL。
- */
+/** 核心调度循环：调 LLM → 执行工具调用并回填结果 → 直到模型返回文本。工具异常由执行器兜底。 */
 public final class CodingAgent {
 
     private static final int MAX_ITERATIONS = 24;
@@ -44,7 +40,7 @@ public final class CodingAgent {
         this.skillRegistry = skillRegistry;
     }
 
-    /** 执行一轮用户输入：有工具调用则执行回填继续，无则返回文本收尾。 */
+    /** 执行一轮用户输入，循环执行工具调用，返回最终文本回复。 */
     public String runTurn(String userInput) {
         if (history.isEmpty()) {
             history.add(new SystemMessage(systemPrompt()));
@@ -68,12 +64,11 @@ public final class CodingAgent {
         return "(已达最大迭代 " + MAX_ITERATIONS + " 次，可继续输入引导我完成)";
     }
 
-    /** 清空对话历史（System prompt 下轮自动重建）。 */
+    /** 清空对话历史，System prompt 下轮自动重建。 */
     public void clear() {
         history.clear();
     }
 
-    /** 系统提示词：基础段直接拼上技能清单（无技能时省略技能段）。 */
     private String systemPrompt() {
         String base = """
                 你是运行在用户本机的编码 agent。工作目录: %s（只能访问其中文件）。

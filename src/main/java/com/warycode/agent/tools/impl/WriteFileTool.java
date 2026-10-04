@@ -8,7 +8,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-/** writeFile：整体覆盖写，父目录自动创建，适合新建与重写。 */
+/** writeFile：整体覆盖写文件，父目录自动创建。 */
 public final class WriteFileTool extends WorkspaceTool implements Tool {
 
     public WriteFileTool(Path workspace) {

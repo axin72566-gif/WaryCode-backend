@@ -8,7 +8,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-/** readFile：带行号读取文本文件，与 editFile 形成"看行号 → 精确改"的配合。 */
+/** readFile：带行号读取文本文件，大文件用 offset/limit 分段。 */
 public final class ReadFileTool extends WorkspaceTool implements Tool {
 
     private static final int MAX_CHARS = 64 * 1024;

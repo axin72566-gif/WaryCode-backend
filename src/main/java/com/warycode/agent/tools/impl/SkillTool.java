@@ -7,11 +7,7 @@ import com.warycode.agent.tools.Tool;
 import java.util.List;
 import java.util.Map;
 
-/**
- * skill 工具：按名取回技能的完整操作指引（SKILL.md 正文）。
- * 不继承 WorkspaceTool——查的是启动时构建的内存注册表，不走文件路径沙箱。
- * 注册前提：注册表非空（Main 装配处保证），模型经系统提示词中的清单决定何时调用。
- */
+/** skill 工具：按名返回技能的完整指引。查内存注册表，不走文件沙箱。 */
 public final class SkillTool implements Tool {
 
     private final SkillRegistry skills;

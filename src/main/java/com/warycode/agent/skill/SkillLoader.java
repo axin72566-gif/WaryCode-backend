@@ -9,18 +9,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 
-/**
- * 技能加载器：扫描技能根目录下的一级子目录，解析每个 SKILL.md 的
- * frontmatter（name/description）与正文，构建技能注册表。
- * 技能属于项目自身能力，目录相对启动目录解析（与 config.properties 同一约定），与 workspace 解耦。
- * 单个文件损坏只警告跳过，不让整个 agent 起不来。
- */
+/** 扫描技能目录解析 SKILL.md 构建注册表；单个技能损坏只警告跳过，不阻断启动。 */
 public final class SkillLoader {
 
     private SkillLoader() {
     }
 
-    /** 扫描 skillsDir 下所有 skills/<name>/SKILL.md；目录不存在或为空返回空注册表。 */
+    /** 加载 skillsDir 下所有 <name>/SKILL.md；目录不存在返回空注册表。 */
     public static SkillRegistry load(Path skillsDir) {
         Map<String, Skill> skills = new LinkedHashMap<>();
         if (!Files.isDirectory(skillsDir)) {
@@ -37,7 +32,7 @@ public final class SkillLoader {
         return new SkillRegistry(skills);
     }
 
-    /** 加载单个技能目录；无 SKILL.md 的目录静默忽略，其余问题警告后跳过。 */
+    /** 加载单个技能目录；无 SKILL.md 静默忽略，其余问题警告后跳过。 */
     private static void loadOne(Path dir, Map<String, Skill> skills) {
         String dirName = dir.getFileName().toString();
         Path file = dir.resolve("SKILL.md");
@@ -62,7 +57,7 @@ public final class SkillLoader {
         }
     }
 
-    /** 最小 frontmatter 解析：首行 --- 到下一个 --- 之间按第一个冒号切分键值，只认单行 name/description。 */
+    /** 解析 --- 围栏的 frontmatter（只认单行 name/description）与正文。 */
     private static Frontmatter parse(String content) {
         String[] lines = content.split("\n", -1);
         if (lines.length < 2 || !lines[0].trim().equals("---")) {
@@ -90,7 +85,7 @@ public final class SkillLoader {
             }
         }
         if (end < 0) {
-            return null; // 有开头无结尾的围栏，视为无 frontmatter
+            return null; // 围栏未闭合，视为无 frontmatter
         }
         String body = String.join("\n", Arrays.copyOfRange(lines, end + 1, lines.length)).strip();
         return new Frontmatter(name, description, body);

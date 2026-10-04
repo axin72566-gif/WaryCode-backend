@@ -28,11 +28,7 @@ import com.warycode.agent.llm.model.UserMessage;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * OpenAI SDK 适配器：全工程唯一允许 import com.openai.* 的地方。
- * complete() 三步走：请求转 SDK 类型 → 调 API → 响应转内部模型，
- * SDK 变化的影响面收敛在本文件。
- */
+/** ChatClient 的 OpenAI SDK 实现；全工程仅本文件依赖 SDK 类型。 */
 public final class OpenAiChatClient implements ChatClient {
 
     private final OpenAIClient client;
@@ -43,8 +39,7 @@ public final class OpenAiChatClient implements ChatClient {
 
     @Override
     public ChatResponse complete(ChatRequest request) {
-        // 第 1 步：请求转 SDK 类型。消息走 sealed switch（新增消息类型时编译器强制补分支），
-        // 工具定义把 schema 的纯 Map 塞进 SDK 的 FunctionParameters
+        // 消息走 sealed switch，工具定义把 schema 的纯 Map 塞进 SDK 的 FunctionParameters
         ChatCompletionCreateParams.Builder builder = ChatCompletionCreateParams.builder()
                 .model(request.model());
         for (ChatMessage m : request.messages()) {
@@ -55,7 +50,7 @@ public final class OpenAiChatClient implements ChatClient {
                         ChatCompletionUserMessageParam.builder().content(u.content()).build());
                 case AssistantMessage a -> {
                     ChatCompletionAssistantMessageParam.Builder b = ChatCompletionAssistantMessageParam.builder();
-                    if (a.text() != null) {   // text 可为 null：纯工具调用轮模型通常不输出文本
+                    if (a.text() != null) {   // 纯工具调用轮 text 可为 null
                         b.content(a.text());
                     }
                     for (ToolCall c : a.toolCalls()) {
@@ -72,7 +67,7 @@ public final class OpenAiChatClient implements ChatClient {
                 case ToolMessage t -> ChatCompletionMessageParam.ofTool(
                         ChatCompletionToolMessageParam.builder()
                                 .toolCallId(t.toolCallId())
-                                // OpenAI 协议无错误标记字段，用前缀让模型明确感知失败
+                                // OpenAI 协议无错误标记字段，用前缀标记失败
                                 .content(t.isError() ? "[工具执行出错] " + t.content() : t.content())
                                 .build());
             });
@@ -89,16 +84,14 @@ public final class OpenAiChatClient implements ChatClient {
                     .build());
         }
 
-        // 第 2 步：调 API
         ChatCompletionMessage message = client.chat().completions()
                 .create(builder.build())
                 .choices().getFirst()
                 .message();
 
-        // 第 3 步：响应转内部模型；argumentsJson 原样透传，解析推迟到工具边界
         List<ToolCall> toolCalls = new ArrayList<>();
         for (var tc : message.toolCalls().orElse(List.of())) {
-            var call = tc.asFunction();   // 本工程只用 function 型 tool call
+            var call = tc.asFunction();   // 只用 function 型 tool call
             var fn = call.function();
             toolCalls.add(new ToolCall(call.id(), fn.name(), fn.arguments()));
         }

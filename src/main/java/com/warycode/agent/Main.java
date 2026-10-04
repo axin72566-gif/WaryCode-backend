@@ -14,9 +14,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.stream.Collectors;
 
-/**
- * 入口：只做组件装配和启动，交互循环在 Repl。
- */
+/** 入口：装配组件并启动 REPL。 */
 public final class Main {
 
     public static void main(String[] args) throws IOException {

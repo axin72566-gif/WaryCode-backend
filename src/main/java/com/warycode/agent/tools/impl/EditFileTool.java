@@ -8,7 +8,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-/** editFile：精确字符串替换，old_string 必须唯一出现；不唯一时报错引导模型先 readFile。 */
+/** editFile：精确字符串替换，old_string 须在文件中唯一出现。 */
 public final class EditFileTool extends WorkspaceTool implements Tool {
 
     public EditFileTool(Path workspace) {

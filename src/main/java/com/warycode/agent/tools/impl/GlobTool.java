@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
-/** glob：按模式查找文件名，修改时间倒序（最新改动优先），限 200 条。 */
+/** glob：按模式查找文件名，修改时间倒序，限 200 条。 */
 public final class GlobTool extends WorkspaceTool implements Tool {
 
     private static final int MAX_RESULTS = 200;
@@ -46,7 +46,6 @@ public final class GlobTool extends WorkspaceTool implements Tool {
         Path base = resolve(args.containsKey("path") ? arg(args, "path") : ".");
         PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + arg(args, "pattern"));
 
-        // 第一步：遍历目录，收集匹配的文件（绝对路径）
         List<Path> matches = new ArrayList<>();
         try (Stream<Path> stream = Files.walk(base, MAX_DEPTH)) {
             for (Path file : stream.toList()) {
@@ -63,7 +62,6 @@ public final class GlobTool extends WorkspaceTool implements Tool {
             }
         }
 
-        // 第二步：按修改时间倒序（最新改动优先），超过上限只保留前 MAX_RESULTS 个
         matches.sort((a, b) -> Long.compare(lastModifiedTime(b), lastModifiedTime(a)));
         if (matches.size() > MAX_RESULTS) {
             matches = matches.subList(0, MAX_RESULTS);
