@@ -26,15 +26,15 @@ public final class CodingAgent {
 
     private final ChatClient chatClient;
     private final ToolExecutor executor;
-    private final ToolRegistry registry;
+    private final ToolRegistry toolRegistry;
     private final AgentConfig config;
     private final SkillRegistry skillRegistry;
     private final List<ChatMessage> history = new ArrayList<>();
 
-    public CodingAgent(ChatClient chatClient, ToolRegistry registry, ToolExecutor executor, AgentConfig config,
+    public CodingAgent(ChatClient chatClient, ToolRegistry toolRegistry, ToolExecutor executor, AgentConfig config,
                        SkillRegistry skillRegistry) {
         this.chatClient = chatClient;
-        this.registry = registry;
+        this.toolRegistry = toolRegistry;
         this.executor = executor;
         this.config = config;
         this.skillRegistry = skillRegistry;
@@ -49,7 +49,7 @@ public final class CodingAgent {
 
         for (int i = 0; i < MAX_ITERATIONS; i++) {
             ChatRequest request = new ChatRequest(
-                    config.model(), List.copyOf(history), registry.definitions());
+                    config.model(), List.copyOf(history), toolRegistry.definitions());
             ChatResponse response = chatClient.complete(request);
 
             history.add(new AssistantMessage(response.text(), response.toolCalls()));
@@ -70,7 +70,7 @@ public final class CodingAgent {
     }
 
     private String systemPrompt() {
-        String base = """
+        String basePrompt = """
                 你是运行在用户本机的编码 agent。工作目录: %s（只能访问其中文件）。
                 工具使用准则:
                 1) 修改文件前先 readFile 看内容;
@@ -81,12 +81,12 @@ public final class CodingAgent {
                 6) 任务完成后简述你做了哪些改动。
                 """.formatted(config.workspace());
         if (skillRegistry.isEmpty()) {
-            return base;
+            return basePrompt;
         }
-        String skills = "可用技能（任务匹配下方描述时，先调用 skill 工具加载完整指引，再按指引执行）:\n"
+        String skillsSection = "可用技能（任务匹配下方描述时，先调用 skill 工具加载完整指引，再按指引执行）:\n"
                 + skillRegistry.all().stream()
                 .map(skill -> "- " + skill.name() + ": " + skill.description())
                 .collect(Collectors.joining("\n"));
-        return base + "\n\n" + skills;
+        return basePrompt + "\n\n" + skillsSection;
     }
 }

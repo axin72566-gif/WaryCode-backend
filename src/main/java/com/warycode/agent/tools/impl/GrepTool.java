@@ -47,19 +47,19 @@ public final class GrepTool extends WorkspaceTool implements Tool {
 
     @Override
     public String execute(Map<String, Object> args) throws Exception {
-        Path base = resolve(args.containsKey("path") ? arg(args, "path") : ".");
+        Path searchRoot = resolve(args.containsKey("path") ? arg(args, "path") : ".");
         Pattern regex = Pattern.compile(arg(args, "pattern"));
-        PathMatcher include = args.containsKey("include")
+        PathMatcher includeFilter = args.containsKey("include")
                 ? FileSystems.getDefault().getPathMatcher("glob:" + arg(args, "include"))
                 : null;
         int maxHits = Math.min(argInt(args, "max_results", MAX_HITS), MAX_HITS);
 
         List<Path> files;
-        try (Stream<Path> stream = Files.walk(base, MAX_DEPTH)) {
+        try (Stream<Path> stream = Files.walk(searchRoot, MAX_DEPTH)) {
             files = stream.toList();
         }
 
-        StringBuilder sb = new StringBuilder();
+        StringBuilder result = new StringBuilder();
         int hits = 0;
         for (Path file : files) {
             if (hits >= maxHits) {
@@ -72,30 +72,30 @@ public final class GrepTool extends WorkspaceTool implements Tool {
             if (isIgnored(relative)) {
                 continue;
             }
-            if (include != null && !include.matches(file.getFileName())) {
+            if (includeFilter != null && !includeFilter.matches(file.getFileName())) {
                 continue;
             }
-            hits = scanFile(file, relative, regex, sb, hits, maxHits);
+            hits = scanFile(file, relative, regex, result, hits, maxHits);
         }
 
         if (hits == 0) {
             return "无匹配";
         }
         if (hits >= maxHits) {
-            sb.append("…[达 ").append(maxHits).append(" 条上限]\n");
+            result.append("…[达 ").append(maxHits).append(" 条上限]\n");
         }
-        return sb.toString();
+        return result.toString();
     }
 
-    /** 扫描单文件，命中行写入 sb，返回累计命中数；二进制/非 UTF-8 文件跳过。 */
-    private int scanFile(Path file, Path relative, Pattern regex, StringBuilder sb, int hits, int maxHits) {
+    /** 扫描单文件，命中行写入 result，返回累计命中数；二进制/非 UTF-8 文件跳过。 */
+    private int scanFile(Path file, Path relative, Pattern regex, StringBuilder result, int hits, int maxHits) {
         try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             int lineNo = 0;
             String line;
             while ((line = reader.readLine()) != null && hits < maxHits) {
                 lineNo++;
                 if (regex.matcher(line).find()) {
-                    sb.append(relative).append(':').append(lineNo).append(": ").append(line.trim()).append('\n');
+                    result.append(relative).append(':').append(lineNo).append(": ").append(line.trim()).append('\n');
                     hits++;
                 }
             }

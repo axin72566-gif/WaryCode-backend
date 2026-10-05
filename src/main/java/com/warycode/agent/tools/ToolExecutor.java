@@ -22,10 +22,10 @@ public final class ToolExecutor {
     };
 
     /** 工具执行线程池；daemon 线程保证 main 返回后 JVM 正常退出。 */
-    private final ExecutorService runner = Executors.newCachedThreadPool(r -> {
-        Thread t = new Thread(r, "tool-runner");
-        t.setDaemon(true);
-        return t;
+    private final ExecutorService workerPool = Executors.newCachedThreadPool(runnable -> {
+        Thread thread = new Thread(runnable, "tool-runner");
+        thread.setDaemon(true);
+        return thread;
     });
 
     private final ToolRegistry registry;
@@ -44,26 +44,26 @@ public final class ToolExecutor {
         // 找不到工具不抛异常，把可用清单告诉模型让它重试
         Tool tool = registry.find(call.name());
         if (tool == null) {
-            String msg = "未知工具 " + call.name() + "，可用工具: " + registry.names();
-            System.out.println("  " + Ansi.red("✗ " + msg));
-            return new ToolResult(true, msg);
+            String errorMessage = "未知工具 " + call.name() + "，可用工具: " + registry.names();
+            System.out.println("  " + Ansi.red("✗ " + errorMessage));
+            return new ToolResult(true, errorMessage);
         }
 
         boolean isError = false;
         String output;
         try {
             Map<String, Object> args = JSON.readValue(call.argumentsJson(), ARGS_TYPE);
-            long budget = tool.timeoutSeconds(args);
-            Future<String> future = runner.submit(() -> tool.execute(args));
+            long timeoutSeconds = tool.timeoutSeconds(args);
+            Future<String> future = workerPool.submit(() -> tool.execute(args));
             try {
-                output = future.get(budget, TimeUnit.SECONDS);
+                output = future.get(timeoutSeconds, TimeUnit.SECONDS);
             } catch (TimeoutException e) {
                 future.cancel(true);
-                throw new IllegalStateException("执行超时(" + budget + "s)，已中断放弃；可缩小操作范围后重试");
+                throw new IllegalStateException("执行超时(" + timeoutSeconds + "s)，已中断放弃；可缩小操作范围后重试");
             } catch (ExecutionException e) {
                 Throwable cause = e.getCause() != null ? e.getCause() : e;
-                if (cause instanceof Exception checked) {
-                    throw checked;
+                if (cause instanceof Exception ex) {
+                    throw ex;
                 }
                 throw new RuntimeException(cause);
             }

@@ -1,13 +1,13 @@
 package com.warycode.agent;
 
+import cn.hutool.core.io.IoUtil;
+import cn.hutool.core.util.StrUtil;
 import com.warycode.agent.agent.CodingAgent;
 import com.warycode.agent.skill.Skill;
 import com.warycode.agent.skill.SkillRegistry;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
@@ -17,25 +17,25 @@ import java.util.Optional;
 public final class Repl {
 
     private final CodingAgent agent;
-    private final SkillRegistry skills;
+    private final SkillRegistry skillRegistry;
 
-    public Repl(CodingAgent agent, SkillRegistry skills) {
+    public Repl(CodingAgent agent, SkillRegistry skillRegistry) {
         this.agent = agent;
-        this.skills = skills;
+        this.skillRegistry = skillRegistry;
     }
 
     /** 主循环，输入流结束或 /exit 时退出。 */
     public void run() throws IOException {
-        BufferedReader in = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
+        BufferedReader inputReader = new BufferedReader(IoUtil.getBomReader(System.in));
         while (true) {
             System.out.print("\n" + Ansi.teal("> "));
             System.out.flush();
 
-            String line = in.readLine();
+            String line = inputReader.readLine();
             if (line == null) {
                 return;
             }
-            line = line.trim();
+            line = StrUtil.trim(line);
             if (line.isEmpty()) {
                 continue;
             }
@@ -51,9 +51,8 @@ public final class Repl {
 
     /** 分发命令，返回 false 表示退出程序。 */
     private boolean handleCommand(String line) {
-        int space = line.indexOf(' ');
-        String command = space < 0 ? line : line.substring(0, space);
-        String rest = space < 0 ? "" : line.substring(space + 1).trim();
+        String command = StrUtil.subBefore(line, ' ', false);
+        String commandArgs = StrUtil.trimToEmpty(StrUtil.subAfter(line, ' ', false));
         switch (command) {
             case "/exit", "/quit" -> {
                 return false;
@@ -62,7 +61,7 @@ public final class Repl {
                 agent.clear();
                 System.out.println(Ansi.dim("(已清空对话)"));
             }
-            case "/skill" -> handleSkill(rest);
+            case "/skill" -> handleSkill(commandArgs);
             case "/help" -> System.out.println("/exit /quit 退出 | /clear 清空对话 | /skill [名称] 查看或使用技能");
             default -> System.out.println("未知命令: " + command + "，/help 查看可用命令");
         }
@@ -70,28 +69,27 @@ public final class Repl {
     }
 
     /** /skill：无参列出技能清单；带名执行技能，名后可附补充说明。 */
-    private void handleSkill(String rest) {
-        if (rest.isEmpty()) {
-            if (skills.isEmpty()) {
+    private void handleSkill(String commandArgs) {
+        if (commandArgs.isEmpty()) {
+            if (skillRegistry.isEmpty()) {
                 System.out.println(Ansi.dim("(无可用技能)"));
             } else {
-                for (Skill skill : skills.all()) {
+                for (Skill skill : skillRegistry.all()) {
                     System.out.println("  " + Ansi.teal(skill.name()) + "  " + Ansi.dim(skill.description()));
                 }
             }
             return;
         }
-        int space = rest.indexOf(' ');
-        String name = space < 0 ? rest : rest.substring(0, space);
-        String extra = space < 0 ? "" : rest.substring(space + 1).trim();
-        Optional<Skill> found = skills.find(name);
-        if (found.isEmpty()) {
-            System.out.println(Ansi.red("[未知技能] ") + name + "，可用: "
-                    + skills.all().stream().map(Skill::name).toList());
+        String skillName = StrUtil.subBefore(commandArgs, ' ', false);
+        String extraInstructions = StrUtil.trimToEmpty(StrUtil.subAfter(commandArgs, ' ', false));
+        Optional<Skill> matchedSkill = skillRegistry.find(skillName);
+        if (matchedSkill.isEmpty()) {
+            System.out.println(Ansi.red("[未知技能] ") + skillName + "，可用: "
+                    + skillRegistry.all().stream().map(Skill::name).toList());
             return;
         }
-        String task = "[技能指引: " + name + "]\n" + found.get().body();
-        runTask(extra.isEmpty() ? task : task + "\n\n" + extra);
+        String taskPrompt = "[技能指引: " + skillName + "]\n" + matchedSkill.get().body();
+        runTask(extraInstructions.isEmpty() ? taskPrompt : taskPrompt + "\n\n" + extraInstructions);
     }
 
     /** 执行任务并打印回答；失败只报错不退出。 */
@@ -99,10 +97,13 @@ public final class Repl {
         try {
             String answer = agent.runTurn(input);
             System.out.println();
-            System.out.println(Ansi.dim("  ── 回答 ──────────────"));
+            System.out.println(Ansi.dim("  ========================== 回答 =========================="));
+            System.out.println();
             System.out.println(answer);
+            System.out.println();
+            System.out.println(Ansi.dim("  ========================== 回答 =========================="));
         } catch (Exception e) {
-            System.out.println(Ansi.red("[LLM 调用失败] ") + (e.getMessage() != null ? e.getMessage() : e));
+            System.out.println(Ansi.red("[LLM 调用失败] ") + StrUtil.blankToDefault(e.getMessage(), e.toString()));
         }
     }
 }

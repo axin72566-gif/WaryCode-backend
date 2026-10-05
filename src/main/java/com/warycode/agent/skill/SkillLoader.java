@@ -21,11 +21,11 @@ public final class SkillLoader {
         if (!Files.isDirectory(skillsDir)) {
             return new SkillRegistry(skills);
         }
-        try (Stream<Path> dirs = Files.list(skillsDir)) {
-            dirs.filter(Files::isDirectory)
+        try (Stream<Path> subDirs = Files.list(skillsDir)) {
+            subDirs.filter(Files::isDirectory)
                     .map(Path::toAbsolutePath)
                     .sorted()
-                    .forEach(dir -> loadOne(dir, skills));
+                    .forEach(skillDir -> loadOne(skillDir, skills));
         } catch (IOException e) {
             System.err.println("[skill] 扫描目录失败: " + e.getMessage());
         }
@@ -33,27 +33,27 @@ public final class SkillLoader {
     }
 
     /** 加载单个技能目录；无 SKILL.md 静默忽略，其余问题警告后跳过。 */
-    private static void loadOne(Path dir, Map<String, Skill> skills) {
-        String dirName = dir.getFileName().toString();
-        Path file = dir.resolve("SKILL.md");
-        if (!Files.isRegularFile(file)) {
+    private static void loadOne(Path skillDir, Map<String, Skill> skills) {
+        String skillDirName = skillDir.getFileName().toString();
+        Path skillFile = skillDir.resolve("SKILL.md");
+        if (!Files.isRegularFile(skillFile)) {
             return;
         }
         try {
-            Frontmatter fm = parse(Files.readString(file, StandardCharsets.UTF_8));
-            if (fm == null || fm.name.isBlank() || fm.description.isBlank()) {
-                System.err.println("[skill] 跳过 " + dirName + ": 缺少 frontmatter 或 name/description 字段");
+            Frontmatter frontmatter = parse(Files.readString(skillFile, StandardCharsets.UTF_8));
+            if (frontmatter == null || frontmatter.name.isBlank() || frontmatter.description.isBlank()) {
+                System.err.println("[skill] 跳过 " + skillDirName + ": 缺少 frontmatter 或 name/description 字段");
                 return;
             }
-            if (!fm.name.equals(dirName)) {
-                System.err.println("[skill] 警告: 目录名 " + dirName + " 与 frontmatter name \"" + fm.name + "\" 不一致，以 frontmatter 为准");
+            if (!frontmatter.name.equals(skillDirName)) {
+                System.err.println("[skill] 警告: 目录名 " + skillDirName + " 与 frontmatter name \"" + frontmatter.name + "\" 不一致，以 frontmatter 为准");
             }
-            if (skills.containsKey(fm.name)) {
-                throw new IllegalStateException("技能重名: " + fm.name);
+            if (skills.containsKey(frontmatter.name)) {
+                throw new IllegalStateException("技能重名: " + frontmatter.name);
             }
-            skills.put(fm.name, new Skill(fm.name, fm.description, fm.body));
+            skills.put(frontmatter.name, new Skill(frontmatter.name, frontmatter.description, frontmatter.body));
         } catch (IOException e) {
-            System.err.println("[skill] 跳过 " + dirName + ": 读取失败 " + e.getMessage());
+            System.err.println("[skill] 跳过 " + skillDirName + ": 读取失败 " + e.getMessage());
         }
     }
 
@@ -65,29 +65,29 @@ public final class SkillLoader {
         }
         String name = "";
         String description = "";
-        int end = -1;
-        for (int i = 1; i < lines.length; i++) {
-            String line = lines[i].trim();
+        int closingFenceIndex = -1;
+        for (int lineIndex = 1; lineIndex < lines.length; lineIndex++) {
+            String line = lines[lineIndex].trim();
             if (line.equals("---")) {
-                end = i;
+                closingFenceIndex = lineIndex;
                 break;
             }
-            int colon = line.indexOf(':');
-            if (colon <= 0) {
+            int colonIndex = line.indexOf(':');
+            if (colonIndex <= 0) {
                 continue;
             }
-            String key = line.substring(0, colon).trim();
-            String value = line.substring(colon + 1).trim();
+            String key = line.substring(0, colonIndex).trim();
+            String value = line.substring(colonIndex + 1).trim();
             switch (key) {
                 case "name" -> name = value;
                 case "description" -> description = value;
                 default -> { }
             }
         }
-        if (end < 0) {
+        if (closingFenceIndex < 0) {
             return null; // 围栏未闭合，视为无 frontmatter
         }
-        String body = String.join("\n", Arrays.copyOfRange(lines, end + 1, lines.length)).strip();
+        String body = String.join("\n", Arrays.copyOfRange(lines, closingFenceIndex + 1, lines.length)).strip();
         return new Frontmatter(name, description, body);
     }
 

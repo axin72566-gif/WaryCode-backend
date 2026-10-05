@@ -17,29 +17,29 @@ abstract class WorkspaceTool {
 
     /** 取必填字符串参数，缺失抛错。 */
     protected static String arg(Map<String, Object> args, String key) {
-        Object v = args.get(key);
-        if (v == null) {
+        Object value = args.get(key);
+        if (value == null) {
             throw new IllegalArgumentException("缺少必填参数: " + key);
         }
-        return String.valueOf(v);
+        return String.valueOf(value);
     }
 
     /** 取可选整数参数，未传用默认值；容忍模型把数字输出成字符串。 */
-    protected static int argInt(Map<String, Object> args, String key, int def) {
-        Object v = args.get(key);
-        if (v == null) {
-            return def;
+    protected static int argInt(Map<String, Object> args, String key, int defaultValue) {
+        Object value = args.get(key);
+        if (value == null) {
+            return defaultValue;
         }
-        return Integer.parseInt(String.valueOf(v).trim());
+        return Integer.parseInt(String.valueOf(value).trim());
     }
 
     /** 沙箱校验：解析为 workspace 内的绝对路径，越界（../ 逃逸、外部绝对路径）抛错。 */
-    protected Path resolve(String raw) {
-        Path p = workspace.resolve(raw).normalize();
-        if (!p.startsWith(workspace)) {
-            throw new IllegalArgumentException("路径越界(仅允许工作目录内): " + raw);
+    protected Path resolve(String rawPath) {
+        Path resolved = workspace.resolve(rawPath).normalize();
+        if (!resolved.startsWith(workspace)) {
+            throw new IllegalArgumentException("路径越界(仅允许工作目录内): " + rawPath);
         }
-        return p;
+        return resolved;
     }
 
     /** 路径任一段命中忽略目录(.git/target/node_modules/.idea)时返回 true。 */

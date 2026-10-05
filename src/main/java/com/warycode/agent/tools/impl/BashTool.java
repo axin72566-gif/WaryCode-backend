@@ -45,19 +45,19 @@ public final class BashTool extends WorkspaceTool implements Tool {
     @Override
     public String execute(Map<String, Object> args) throws Exception {
         String command = arg(args, "command");
-        boolean windows = System.getProperty("os.name").toLowerCase().contains("win");
-        Path log = Files.createTempFile("warycode-bash-", ".out");
-        log.toFile().deleteOnExit();           // 兜底：句柄未释放删不掉时，退出时补删
+        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        Path outputFile = Files.createTempFile("warycode-bash-", ".out");
+        outputFile.toFile().deleteOnExit();           // 兜底：句柄未释放删不掉时，退出时补删
 
         Process process = new ProcessBuilder(
-                        windows ? List.of("cmd.exe", "/c", command) : List.of("sh", "-c", command))
+                        isWindows ? List.of("cmd.exe", "/c", command) : List.of("sh", "-c", command))
                 .directory(workspace.toFile())
                 .redirectErrorStream(true)
-                .redirectOutput(log.toFile())
+                .redirectOutput(outputFile.toFile())
                 .start();
         try {
             process.waitFor();
-            return "exit=" + process.exitValue() + "\n" + Files.readString(log, StandardCharsets.UTF_8);
+            return "exit=" + process.exitValue() + "\n" + Files.readString(outputFile, StandardCharsets.UTF_8);
         } finally {
             // Windows 上 destroyForcibly 只杀直接进程(cmd.exe)，需连进程树一起回收防孤儿
             try (var children = process.toHandle().descendants()) {
@@ -65,7 +65,7 @@ public final class BashTool extends WorkspaceTool implements Tool {
             }
             process.destroyForcibly();
             try {
-                Files.deleteIfExists(log);
+                Files.deleteIfExists(outputFile);
             } catch (IOException e) {
                 // 句柄未放完的偶发竞态，交给 deleteOnExit 兜底
             }

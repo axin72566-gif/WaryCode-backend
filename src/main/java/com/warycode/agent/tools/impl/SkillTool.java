@@ -10,10 +10,10 @@ import java.util.Map;
 /** skill 工具：按名返回技能的完整指引。查内存注册表，不走文件沙箱。 */
 public final class SkillTool implements Tool {
 
-    private final SkillRegistry skills;
+    private final SkillRegistry skillRegistry;
 
-    public SkillTool(SkillRegistry skills) {
-        this.skills = skills;
+    public SkillTool(SkillRegistry skillRegistry) {
+        this.skillRegistry = skillRegistry;
     }
 
     @Override
@@ -37,17 +37,17 @@ public final class SkillTool implements Tool {
 
     @Override
     public String execute(Map<String, Object> args) {
-        Object raw = args.get("name");
-        String name = raw == null ? "" : String.valueOf(raw).trim();
-        if (name.isEmpty()) {
-            return "缺少参数 name。可用技能: " + names();
+        Object rawName = args.get("name");
+        String skillName = rawName == null ? "" : String.valueOf(rawName).trim();
+        if (skillName.isEmpty()) {
+            return "缺少参数 name。可用技能: " + formatAvailableSkills();
         }
-        return skills.find(name)
+        return skillRegistry.find(skillName)
                 .map(Skill::body)
-                .orElseGet(() -> "未知技能: " + name + "。可用技能: " + names());
+                .orElseGet(() -> "未知技能: " + skillName + "。可用技能: " + formatAvailableSkills());
     }
 
-    private String names() {
-        return skills.all().stream().map(Skill::name).toList().toString();
+    private String formatAvailableSkills() {
+        return skillRegistry.all().stream().map(Skill::name).toList().toString();
     }
 }

@@ -37,14 +37,14 @@ public final class WriteFileTool extends WorkspaceTool implements Tool {
 
     @Override
     public String execute(Map<String, Object> args) throws Exception {
-        String raw = arg(args, "path");
-        Path p = resolve(raw);
+        String rawPath = arg(args, "path");
+        Path file = resolve(rawPath);
         String content = arg(args, "content");
-        if (p.getParent() != null) {
-            Files.createDirectories(p.getParent());
+        if (file.getParent() != null) {
+            Files.createDirectories(file.getParent());
         }
-        Files.writeString(p, content, StandardCharsets.UTF_8);
+        Files.writeString(file, content, StandardCharsets.UTF_8);
         long lineCount = content.lines().count();
-        return "已写入 " + workspace.relativize(p) + " (" + content.length() + " 字符, " + lineCount + " 行)";
+        return "已写入 " + workspace.relativize(file) + " (" + content.length() + " 字符, " + lineCount + " 行)";
     }
 }

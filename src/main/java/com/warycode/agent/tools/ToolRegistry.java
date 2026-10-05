@@ -38,7 +38,7 @@ public final class ToolRegistry {
     /** 导出为 LLM 工具声明。 */
     public List<ToolDefinition> definitions() {
         return tools.values().stream()
-                .map(t -> new ToolDefinition(t.name(), t.description(), t.schema()))
+                .map(tool -> new ToolDefinition(tool.name(), tool.description(), tool.schema()))
                 .toList();
     }
 

@@ -42,43 +42,44 @@ public final class OpenAiChatClient implements ChatClient {
         // 消息走 sealed switch，工具定义把 schema 的纯 Map 塞进 SDK 的 FunctionParameters
         ChatCompletionCreateParams.Builder builder = ChatCompletionCreateParams.builder()
                 .model(request.model());
-        for (ChatMessage m : request.messages()) {
-            builder.addMessage(switch (m) {
-                case SystemMessage s -> ChatCompletionMessageParam.ofSystem(
-                        ChatCompletionSystemMessageParam.builder().content(s.content()).build());
-                case UserMessage u -> ChatCompletionMessageParam.ofUser(
-                        ChatCompletionUserMessageParam.builder().content(u.content()).build());
-                case AssistantMessage a -> {
-                    ChatCompletionAssistantMessageParam.Builder b = ChatCompletionAssistantMessageParam.builder();
-                    if (a.text() != null) {   // 纯工具调用轮 text 可为 null
-                        b.content(a.text());
+        for (ChatMessage message : request.messages()) {
+            builder.addMessage(switch (message) {
+                case SystemMessage systemMessage -> ChatCompletionMessageParam.ofSystem(
+                        ChatCompletionSystemMessageParam.builder().content(systemMessage.content()).build());
+                case UserMessage userMessage -> ChatCompletionMessageParam.ofUser(
+                        ChatCompletionUserMessageParam.builder().content(userMessage.content()).build());
+                case AssistantMessage assistantMessage -> {
+                    ChatCompletionAssistantMessageParam.Builder assistantBuilder =
+                            ChatCompletionAssistantMessageParam.builder();
+                    if (assistantMessage.text() != null) {   // 纯工具调用轮 text 可为 null
+                        assistantBuilder.content(assistantMessage.text());
                     }
-                    for (ToolCall c : a.toolCalls()) {
-                        b.addToolCall(ChatCompletionMessageFunctionToolCall.builder()
-                                .id(c.id())
+                    for (ToolCall toolCall : assistantMessage.toolCalls()) {
+                        assistantBuilder.addToolCall(ChatCompletionMessageFunctionToolCall.builder()
+                                .id(toolCall.id())
                                 .function(ChatCompletionMessageFunctionToolCall.Function.builder()
-                                        .name(c.name())
-                                        .arguments(c.argumentsJson())
+                                        .name(toolCall.name())
+                                        .arguments(toolCall.argumentsJson())
                                         .build())
                                 .build());
                     }
-                    yield ChatCompletionMessageParam.ofAssistant(b.build());
+                    yield ChatCompletionMessageParam.ofAssistant(assistantBuilder.build());
                 }
-                case ToolMessage t -> ChatCompletionMessageParam.ofTool(
+                case ToolMessage toolMessage -> ChatCompletionMessageParam.ofTool(
                         ChatCompletionToolMessageParam.builder()
-                                .toolCallId(t.toolCallId())
+                                .toolCallId(toolMessage.toolCallId())
                                 // OpenAI 协议无错误标记字段，用前缀标记失败
-                                .content(t.isError() ? "[工具执行出错] " + t.content() : t.content())
+                                .content(toolMessage.isError() ? "[工具执行出错] " + toolMessage.content() : toolMessage.content())
                                 .build());
             });
         }
-        for (ToolDefinition def : request.tools()) {
+        for (ToolDefinition toolDefinition : request.tools()) {
             FunctionParameters.Builder params = FunctionParameters.builder();
-            def.schema().forEach((key, value) -> params.putAdditionalProperty(key, JsonValue.from(value)));
+            toolDefinition.schema().forEach((key, value) -> params.putAdditionalProperty(key, JsonValue.from(value)));
             builder.addTool(ChatCompletionFunctionTool.builder()
                     .function(FunctionDefinition.builder()
-                            .name(def.name())
-                            .description(def.description())
+                            .name(toolDefinition.name())
+                            .description(toolDefinition.description())
                             .parameters(params.build())
                             .build())
                     .build());
@@ -90,10 +91,10 @@ public final class OpenAiChatClient implements ChatClient {
                 .message();
 
         List<ToolCall> toolCalls = new ArrayList<>();
-        for (var tc : message.toolCalls().orElse(List.of())) {
-            var call = tc.asFunction();   // 只用 function 型 tool call
-            var fn = call.function();
-            toolCalls.add(new ToolCall(call.id(), fn.name(), fn.arguments()));
+        for (var sdkToolCall : message.toolCalls().orElse(List.of())) {
+            var functionCall = sdkToolCall.asFunction();   // 只用 function 型 tool call
+            var function = functionCall.function();
+            toolCalls.add(new ToolCall(functionCall.id(), function.name(), function.arguments()));
         }
         return new ChatResponse(message.content().orElse(null), toolCalls);
     }

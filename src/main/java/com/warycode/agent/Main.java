@@ -20,13 +20,13 @@ public final class Main {
     public static void main(String[] args) throws IOException {
         AgentConfig config = AgentConfig.load();
         ChatClient chatClient = new OpenAiChatClient(config.apiKey(), config.baseUrl());
-        SkillRegistry skills = SkillLoader.load(Path.of("skills"));
-        ToolRegistry registry = ToolRegistry.of(config.workspace());
-        if (!skills.isEmpty()) {
-            registry.register(new SkillTool(skills));
+        SkillRegistry skillRegistry = SkillLoader.load(Path.of("skills"));
+        ToolRegistry toolRegistry = ToolRegistry.of(config.workspace());
+        if (!skillRegistry.isEmpty()) {
+            toolRegistry.register(new SkillTool(skillRegistry));
         }
-        ToolExecutor executor = new ToolExecutor(registry);
-        CodingAgent agent = new CodingAgent(chatClient, registry, executor, config, skills);
+        ToolExecutor executor = new ToolExecutor(toolRegistry);
+        CodingAgent agent = new CodingAgent(chatClient, toolRegistry, executor, config, skillRegistry);
 
         System.out.print(Ansi.gradient("""
                 ██╗    ██╗ █████╗ ██████╗ ██╗   ██╗ ██████╗ ██████╗ ██╗   ██╗ █████╗
@@ -40,14 +40,14 @@ public final class Main {
         System.out.printf("  %s %s%n", Ansi.dim(String.format("%-10s", "model")), config.model());
         System.out.printf("  %s %s%n", Ansi.dim(String.format("%-10s", "workspace")), config.workspace());
         System.out.printf("  %s %s%n", Ansi.dim(String.format("%-10s", "tools")),
-                String.join(", ", registry.names()));
+                String.join(", ", toolRegistry.names()));
         System.out.printf("  %s %s%n", Ansi.dim(String.format("%-10s", "skills")),
-                skills.isEmpty() ? "无"
-                        : skills.all().size() + " 个（" + skills.all().stream()
+                skillRegistry.isEmpty() ? "无"
+                        : skillRegistry.all().size() + " 个（" + skillRegistry.all().stream()
                         .map(Skill::name).collect(Collectors.joining(", ")) + "）");
         System.out.println();
         System.out.println(Ansi.dim("  输入任务开始; /help 查看命令"));
 
-        new Repl(agent, skills).run();
+        new Repl(agent, skillRegistry).run();
     }
 }

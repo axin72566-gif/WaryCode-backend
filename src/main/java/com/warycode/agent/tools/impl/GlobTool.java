@@ -43,11 +43,11 @@ public final class GlobTool extends WorkspaceTool implements Tool {
 
     @Override
     public String execute(Map<String, Object> args) throws Exception {
-        Path base = resolve(args.containsKey("path") ? arg(args, "path") : ".");
+        Path searchRoot = resolve(args.containsKey("path") ? arg(args, "path") : ".");
         PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + arg(args, "pattern"));
 
         List<Path> matches = new ArrayList<>();
-        try (Stream<Path> stream = Files.walk(base, MAX_DEPTH)) {
+        try (Stream<Path> stream = Files.walk(searchRoot, MAX_DEPTH)) {
             for (Path file : stream.toList()) {
                 if (!Files.isRegularFile(file)) {
                     continue;
@@ -70,11 +70,11 @@ public final class GlobTool extends WorkspaceTool implements Tool {
         if (matches.isEmpty()) {
             return "无匹配文件";
         }
-        StringBuilder sb = new StringBuilder("匹配 " + matches.size() + " 个:\n");
+        StringBuilder result = new StringBuilder("匹配 " + matches.size() + " 个:\n");
         for (Path file : matches) {
-            sb.append(workspace.relativize(file)).append('\n');
+            result.append(workspace.relativize(file)).append('\n');
         }
-        return sb.toString();
+        return result.toString();
     }
 
     private static long lastModifiedTime(Path file) {

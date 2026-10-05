@@ -40,24 +40,24 @@ public final class ReadFileTool extends WorkspaceTool implements Tool {
 
     @Override
     public String execute(Map<String, Object> args) throws Exception {
-        String raw = arg(args, "path");
-        Path p = resolve(raw);
-        if (Files.notExists(p)) {
-            throw new IllegalArgumentException("文件不存在: " + raw);
+        String rawPath = arg(args, "path");
+        Path file = resolve(rawPath);
+        if (Files.notExists(file)) {
+            throw new IllegalArgumentException("文件不存在: " + rawPath);
         }
-        List<String> lines = Files.readAllLines(p, StandardCharsets.UTF_8);
-        int from = Math.max(1, argInt(args, "offset", 1));
-        if (from > lines.size()) {
-            return "(文件共 " + lines.size() + " 行, offset " + from + " 超出范围)";
+        List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+        int fromLine = Math.max(1, argInt(args, "offset", 1));
+        if (fromLine > lines.size()) {
+            return "(文件共 " + lines.size() + " 行, offset " + fromLine + " 超出范围)";
         }
         int limit = argInt(args, "limit", lines.size());
-        int to = Math.min(lines.size(), from - 1 + limit);
+        int toLine = Math.min(lines.size(), fromLine - 1 + limit);
 
-        StringBuilder sb = new StringBuilder("(共 " + lines.size() + " 行, 显示 " + from + "-" + to + ")\n");
-        for (int i = from; i <= to; i++) {
-            sb.append(String.format("%5d| %s%n", i, lines.get(i - 1)));
+        StringBuilder result = new StringBuilder("(共 " + lines.size() + " 行, 显示 " + fromLine + "-" + toLine + ")\n");
+        for (int lineNo = fromLine; lineNo <= toLine; lineNo++) {
+            result.append(String.format("%5d| %s%n", lineNo, lines.get(lineNo - 1)));
         }
-        String content = sb.toString();
+        String content = result.toString();
         return content.length() > MAX_CHARS
                 ? content.substring(0, MAX_CHARS) + "\n…[超64KB已截断,请用 offset/limit 分段读取]"
                 : content;
