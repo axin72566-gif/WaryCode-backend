@@ -9,10 +9,12 @@ import java.util.List;
 import java.util.Map;
 
 /** editFile：精确字符串替换，old_string 须在文件中唯一出现。 */
-public final class EditFileTool extends WorkspaceTool implements Tool {
+public final class EditFileTool implements Tool {
+
+    private final Path workspace;
 
     public EditFileTool(Path workspace) {
-        super(workspace);
+        this.workspace = workspace;
     }
 
     @Override
@@ -38,15 +40,17 @@ public final class EditFileTool extends WorkspaceTool implements Tool {
 
     @Override
     public String execute(Map<String, Object> args) throws Exception {
-        String rawPath = arg(args, "path");
-        Path file = resolve(rawPath);
-        if (Files.notExists(file)) {
-            throw new IllegalArgumentException("文件不存在: " + rawPath);
-        }
-        String originalContent = Files.readString(file, StandardCharsets.UTF_8);
-        String oldString = arg(args, "old_string");
-        String newString = arg(args, "new_string");
+        if (args.get("path") == null) throw new IllegalArgumentException("缺少必填参数: path");
+        if (args.get("old_string") == null) throw new IllegalArgumentException("缺少必填参数: old_string");
+        if (args.get("new_string") == null) throw new IllegalArgumentException("缺少必填参数: new_string");
+        String rawPath = args.get("path").toString();
+        Path file = workspace.resolve(rawPath).normalize();
+        if (!file.startsWith(workspace)) throw new IllegalArgumentException("路径越界(仅允许工作目录内): " + rawPath);
+        if (Files.notExists(file)) throw new IllegalArgumentException("文件不存在: " + rawPath);
 
+        String originalContent = Files.readString(file, StandardCharsets.UTF_8);
+        String oldString = args.get("old_string").toString();
+        String newString = args.get("new_string").toString();
         int matchStart = originalContent.indexOf(oldString);
         if (matchStart < 0) {
             throw new IllegalArgumentException("old_string 未匹配(0 次)，请先 readFile 确认原文");

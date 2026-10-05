@@ -1,24 +1,32 @@
 package com.warycode.agent.tools.impl;
 
 import com.warycode.agent.tools.Tool;
+import org.jetbrains.annotations.NotNull;
 
 import java.nio.file.FileSystems;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Stream;
+import java.util.Set;
 
 /** glob：按模式查找文件名，修改时间倒序，限 200 条。 */
-public final class GlobTool extends WorkspaceTool implements Tool {
+public final class GlobTool implements Tool {
 
     private static final int MAX_RESULTS = 200;
     private static final int MAX_DEPTH = 16;
+    private static final Set<String> IGNORED_DIRS = Set.of(".git", "target", "node_modules", ".idea");
+
+    private final Path workspace;
 
     public GlobTool(Path workspace) {
-        super(workspace);
+        this.workspace = workspace;
     }
 
     @Override
@@ -43,45 +51,44 @@ public final class GlobTool extends WorkspaceTool implements Tool {
 
     @Override
     public String execute(Map<String, Object> args) throws Exception {
-        Path searchRoot = resolve(args.containsKey("path") ? arg(args, "path") : ".");
-        PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + arg(args, "pattern"));
+        if (args.get("pattern") == null) throw new IllegalArgumentException("缺少必填参数: pattern");
+        Object pathArg = args.get("path");
+        String rawPath = pathArg == null ? "." : pathArg.toString();
+        Path searchRoot = workspace.resolve(rawPath).normalize();
+        if (!searchRoot.startsWith(workspace)) throw new IllegalArgumentException("路径越界(仅允许工作目录内): " + rawPath);
+        PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + args.get("pattern"));
 
-        List<Path> matches = new ArrayList<>();
-        try (Stream<Path> stream = Files.walk(searchRoot, MAX_DEPTH)) {
-            for (Path file : stream.toList()) {
-                if (!Files.isRegularFile(file)) {
-                    continue;
-                }
-                Path relative = workspace.relativize(file);
-                if (isIgnored(relative)) {
-                    continue;
-                }
-                if (matcher.matches(relative)) {
-                    matches.add(file);
-                }
+        record Match(Path file, long modifiedAt) {}
+        List<Match> matches = new ArrayList<>();
+        Files.walkFileTree(searchRoot, Set.of(), MAX_DEPTH, new SimpleFileVisitor<>() {
+            @NotNull
+            @Override
+            public FileVisitResult preVisitDirectory(@NotNull Path dir, @NotNull BasicFileAttributes attrs) {
+                // 进入前剪枝：忽略目录整棵子树不遍历
+                return IGNORED_DIRS.contains(dir.getFileName().toString())
+                        ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
             }
-        }
 
-        matches.sort((a, b) -> Long.compare(lastModifiedTime(b), lastModifiedTime(a)));
-        if (matches.size() > MAX_RESULTS) {
-            matches = matches.subList(0, MAX_RESULTS);
-        }
+            @NotNull
+            @Override
+            public FileVisitResult visitFile(@NotNull Path file, @NotNull BasicFileAttributes attrs) {
+                if (Thread.currentThread().isInterrupted()) return FileVisitResult.TERMINATE; // 协作响应超时中断
+                if (attrs.isRegularFile() && matcher.matches(workspace.relativize(file))) {
+                    matches.add(new Match(file, attrs.lastModifiedTime().toMillis()));
+                }
+                return FileVisitResult.CONTINUE;
+            }
+        });
 
-        if (matches.isEmpty()) {
+        matches.sort(Comparator.comparingLong(Match::modifiedAt).reversed());
+        List<Match> top = matches.size() > MAX_RESULTS ? matches.subList(0, MAX_RESULTS) : matches;
+        if (top.isEmpty()) {
             return "无匹配文件";
         }
-        StringBuilder result = new StringBuilder("匹配 " + matches.size() + " 个:\n");
-        for (Path file : matches) {
-            result.append(workspace.relativize(file)).append('\n');
+        StringBuilder result = new StringBuilder("匹配 " + top.size() + " 个:\n");
+        for (Match match : top) {
+            result.append(workspace.relativize(match.file())).append('\n');
         }
         return result.toString();
-    }
-
-    private static long lastModifiedTime(Path file) {
-        try {
-            return Files.getLastModifiedTime(file).toMillis();
-        } catch (Exception e) {
-            return 0L;
-        }
     }
 }

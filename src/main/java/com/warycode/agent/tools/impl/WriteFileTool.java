@@ -9,10 +9,12 @@ import java.util.List;
 import java.util.Map;
 
 /** writeFile：整体覆盖写文件，父目录自动创建。 */
-public final class WriteFileTool extends WorkspaceTool implements Tool {
+public final class WriteFileTool implements Tool {
+
+    private final Path workspace;
 
     public WriteFileTool(Path workspace) {
-        super(workspace);
+        this.workspace = workspace;
     }
 
     @Override
@@ -37,14 +39,15 @@ public final class WriteFileTool extends WorkspaceTool implements Tool {
 
     @Override
     public String execute(Map<String, Object> args) throws Exception {
-        String rawPath = arg(args, "path");
-        Path file = resolve(rawPath);
-        String content = arg(args, "content");
-        if (file.getParent() != null) {
-            Files.createDirectories(file.getParent());
-        }
+        if (args.get("path") == null) throw new IllegalArgumentException("缺少必填参数: path");
+        if (args.get("content") == null) throw new IllegalArgumentException("缺少必填参数: content");
+        String rawPath = args.get("path").toString();
+        Path file = workspace.resolve(rawPath).normalize();
+        if (!file.startsWith(workspace)) throw new IllegalArgumentException("路径越界(仅允许工作目录内): " + rawPath);
+
+        String content = args.get("content").toString();
+        Files.createDirectories(file.getParent());
         Files.writeString(file, content, StandardCharsets.UTF_8);
-        long lineCount = content.lines().count();
-        return "已写入 " + workspace.relativize(file) + " (" + content.length() + " 字符, " + lineCount + " 行)";
+        return "已写入 " + workspace.relativize(file) + " (" + content.length() + " 字符, " + content.lines().count() + " 行)";
     }
 }

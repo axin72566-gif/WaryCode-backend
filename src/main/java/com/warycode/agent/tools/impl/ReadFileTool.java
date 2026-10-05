@@ -9,12 +9,14 @@ import java.util.List;
 import java.util.Map;
 
 /** readFile：带行号读取文本文件，大文件用 offset/limit 分段。 */
-public final class ReadFileTool extends WorkspaceTool implements Tool {
+public final class ReadFileTool implements Tool {
 
     private static final int MAX_CHARS = 64 * 1024;
 
+    private final Path workspace;
+
     public ReadFileTool(Path workspace) {
-        super(workspace);
+        this.workspace = workspace;
     }
 
     @Override
@@ -40,17 +42,20 @@ public final class ReadFileTool extends WorkspaceTool implements Tool {
 
     @Override
     public String execute(Map<String, Object> args) throws Exception {
-        String rawPath = arg(args, "path");
-        Path file = resolve(rawPath);
-        if (Files.notExists(file)) {
-            throw new IllegalArgumentException("文件不存在: " + rawPath);
-        }
+        if (args.get("path") == null) throw new IllegalArgumentException("缺少必填参数: path");
+        String rawPath = args.get("path").toString();
+        Path file = workspace.resolve(rawPath).normalize();
+        if (!file.startsWith(workspace)) throw new IllegalArgumentException("路径越界(仅允许工作目录内): " + rawPath);
+        if (Files.notExists(file)) throw new IllegalArgumentException("文件不存在: " + rawPath);
+
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-        int fromLine = Math.max(1, argInt(args, "offset", 1));
+        Object offsetArg = args.get("offset");
+        int fromLine = offsetArg == null ? 1 : Math.max(1, Integer.parseInt(offsetArg.toString().trim()));
         if (fromLine > lines.size()) {
             return "(文件共 " + lines.size() + " 行, offset " + fromLine + " 超出范围)";
         }
-        int limit = argInt(args, "limit", lines.size());
+        Object limitArg = args.get("limit");
+        int limit = limitArg == null ? lines.size() : Integer.parseInt(limitArg.toString().trim());
         int toLine = Math.min(lines.size(), fromLine - 1 + limit);
 
         StringBuilder result = new StringBuilder("(共 " + lines.size() + " 行, 显示 " + fromLine + "-" + toLine + ")\n");
