@@ -10,14 +10,13 @@ import com.warycode.agent.llm.model.SystemMessage;
 import com.warycode.agent.llm.model.ToolCall;
 import com.warycode.agent.llm.model.ToolMessage;
 import com.warycode.agent.llm.model.UserMessage;
-import com.warycode.agent.skill.SkillRegistry;
 import com.warycode.agent.tools.ToolExecutor;
 import com.warycode.agent.tools.ToolRegistry;
 import com.warycode.agent.tools.ToolResult;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /** 核心调度循环：调 LLM → 执行工具调用并回填结果 → 直到模型返回文本。工具异常由执行器兜底。 */
 public final class CodingAgent {
@@ -28,16 +27,16 @@ public final class CodingAgent {
     private final ToolExecutor executor;
     private final ToolRegistry toolRegistry;
     private final AgentConfig config;
-    private final SkillRegistry skillRegistry;
+    private final Path workspace;
     private final List<ChatMessage> history = new ArrayList<>();
 
     public CodingAgent(ChatClient chatClient, ToolRegistry toolRegistry, ToolExecutor executor, AgentConfig config,
-                       SkillRegistry skillRegistry) {
+                       Path workspace) {
         this.chatClient = chatClient;
         this.toolRegistry = toolRegistry;
         this.executor = executor;
         this.config = config;
-        this.skillRegistry = skillRegistry;
+        this.workspace = workspace;
     }
 
     /** 执行轮：调 LLM → 执行工具调用并回填结果 → 直到模型返回文本。工具异常由执行器兜底。 */
@@ -70,7 +69,7 @@ public final class CodingAgent {
     }
 
     private String systemPrompt() {
-        String basePrompt = """
+        return """
                 你是运行在用户本机的编码 agent。工作目录: %s（只能访问其中文件）。
                 工具使用准则:
                 1) 修改文件前先 readFile 看内容;
@@ -79,14 +78,6 @@ public final class CodingAgent {
                 4) 用 Bash 编译/运行验证改动;
                 5) 大文件用 offset/limit 分段读取;
                 6) 任务完成后简述你做了哪些改动。
-                """.formatted(config.workspace());
-        if (skillRegistry.isEmpty()) {
-            return basePrompt;
-        }
-        String skillsSection = "可用技能（任务匹配下方描述时，先调用 skill 工具加载完整指引，再按指引执行）:\n"
-                + skillRegistry.all().stream()
-                .map(skill -> "- " + skill.name() + ": " + skill.description())
-                .collect(Collectors.joining("\n"));
-        return basePrompt + "\n\n" + skillsSection;
+                """.formatted(workspace);
     }
 }

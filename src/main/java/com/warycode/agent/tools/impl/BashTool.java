@@ -1,15 +1,19 @@
 package com.warycode.agent.tools.impl;
 
 import com.warycode.agent.tools.Tool;
+import org.zeroturnaround.exec.ProcessExecutor;
+import org.zeroturnaround.exec.ProcessResult;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
-/** Bash：在工作目录执行 shell 命令。输出由 OS 落盘到临时文件（无管道可堵），超时中断 waitFor。 */
+/** Bash：在工作目录执行 shell 命令，进程管理全交 zt-exec：输出内存捕获、超时杀进程树、非零退出码不抛只回报。 */
 public final class BashTool implements Tool {
+
+    /** 命令执行预算(秒)，超时时 zt-exec 经 stopper 杀进程树并抛 TimeoutException，由执行器转错误结果。 */
+    private static final long TIMEOUT_SECONDS = 60;
 
     private final Path workspace;
 
@@ -38,28 +42,25 @@ public final class BashTool implements Tool {
 
     @Override
     public String execute(Map<String, Object> args) throws Exception {
-        if (args.get("command") == null) throw new IllegalArgumentException("缺少必填参数: command");
         String command = args.get("command").toString();
         boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
-        Path outputFile = Files.createTempFile("warycode-bash-", ".out");
-
-        Process process = new ProcessBuilder(
-                        isWindows ? List.of("cmd.exe", "/c", command) : List.of("sh", "-c", command))
+        ProcessResult result = new ProcessExecutor()
+                .command(isWindows ? List.of("cmd.exe", "/c", command) : List.of("sh", "-c", command))
                 .directory(workspace.toFile())
                 .redirectErrorStream(true)
-                .redirectOutput(outputFile.toFile())
-                .start();
-        try {
-            // 超时中断在此生效：cancel(true) 使 waitFor 抛 InterruptedException
-            process.waitFor();
-            return "exit=" + process.exitValue() + "\n" + Files.readString(outputFile, StandardCharsets.UTF_8);
-        } finally {
-            // Windows 上 destroyForcibly 只杀直接进程(cmd.exe)，需连进程树一起回收防孤儿
-            try (var children = process.toHandle().descendants()) {
-                children.forEach(ProcessHandle::destroyForcibly);
-            }
-            process.destroyForcibly();
-            Files.delete(outputFile);
+                .readOutput(true)
+                .exitValueAny() // 非零退出码是正常结果(如编译失败)，连同 exit 值回传模型而非抛异常
+                .timeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .stopper(BashTool::killProcessTree) // 超时/取消时连树回收
+                .execute();
+        return "exit=" + result.getExitValue() + "\n" + result.outputUTF8();
+    }
+
+    /** 先杀子孙再杀自身：Windows 上 destroy 只作用于直接进程(cmd.exe)，孙进程需连树回收防孤儿。 */
+    private static void killProcessTree(Process process) {
+        try (var children = process.toHandle().descendants()) {
+            children.forEach(ProcessHandle::destroyForcibly);
         }
+        process.destroyForcibly();
     }
 }

@@ -39,8 +39,6 @@ public final class WriteFileTool implements Tool {
 
     @Override
     public String execute(Map<String, Object> args) throws Exception {
-        if (args.get("path") == null) throw new IllegalArgumentException("缺少必填参数: path");
-        if (args.get("content") == null) throw new IllegalArgumentException("缺少必填参数: content");
         String rawPath = args.get("path").toString();
         Path file = workspace.resolve(rawPath).normalize();
         if (!file.startsWith(workspace)) throw new IllegalArgumentException("路径越界(仅允许工作目录内): " + rawPath);

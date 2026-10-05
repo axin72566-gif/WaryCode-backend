@@ -40,13 +40,9 @@ public final class EditFileTool implements Tool {
 
     @Override
     public String execute(Map<String, Object> args) throws Exception {
-        if (args.get("path") == null) throw new IllegalArgumentException("缺少必填参数: path");
-        if (args.get("old_string") == null) throw new IllegalArgumentException("缺少必填参数: old_string");
-        if (args.get("new_string") == null) throw new IllegalArgumentException("缺少必填参数: new_string");
         String rawPath = args.get("path").toString();
         Path file = workspace.resolve(rawPath).normalize();
         if (!file.startsWith(workspace)) throw new IllegalArgumentException("路径越界(仅允许工作目录内): " + rawPath);
-        if (Files.notExists(file)) throw new IllegalArgumentException("文件不存在: " + rawPath);
 
         String originalContent = Files.readString(file, StandardCharsets.UTF_8);
         String oldString = args.get("old_string").toString();
