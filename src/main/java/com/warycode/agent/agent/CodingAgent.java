@@ -14,7 +14,6 @@ import com.warycode.agent.tools.ToolExecutor;
 import com.warycode.agent.tools.ToolRegistry;
 import com.warycode.agent.tools.ToolResult;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,22 +26,22 @@ public final class CodingAgent {
     private final ToolExecutor executor;
     private final ToolRegistry toolRegistry;
     private final AgentConfig config;
-    private final Path workspace;
+    private final String systemPrompt;
     private final List<ChatMessage> history = new ArrayList<>();
 
     public CodingAgent(ChatClient chatClient, ToolRegistry toolRegistry, ToolExecutor executor, AgentConfig config,
-                       Path workspace) {
+                       String systemPrompt) {
         this.chatClient = chatClient;
         this.toolRegistry = toolRegistry;
         this.executor = executor;
         this.config = config;
-        this.workspace = workspace;
+        this.systemPrompt = systemPrompt;
     }
 
     /** 执行轮：调 LLM → 执行工具调用并回填结果 → 直到模型返回文本。工具异常由执行器兜底。 */
     public String runTurn(String userInput) {
         if (history.isEmpty()) {
-            history.add(new SystemMessage(systemPrompt()));
+            history.add(new SystemMessage(systemPrompt));
         }
         history.add(new UserMessage(userInput));
 
@@ -66,18 +65,5 @@ public final class CodingAgent {
     /** 清空对话历史，System prompt 下轮自动重建。 */
     public void clear() {
         history.clear();
-    }
-
-    private String systemPrompt() {
-        return """
-                你是运行在用户本机的编码 agent。工作目录: %s（只能访问其中文件）。
-                工具使用准则:
-                1) 修改文件前先 readFile 看内容;
-                2) 局部修改优先用 editFile 而非整文件重写;
-                3) 用 glob/grep 定位代码;
-                4) 用 Bash 编译/运行验证改动;
-                5) 大文件用 offset/limit 分段读取;
-                6) 任务完成后简述你做了哪些改动。
-                """.formatted(workspace);
     }
 }
