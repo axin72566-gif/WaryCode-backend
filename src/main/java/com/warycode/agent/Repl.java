@@ -1,6 +1,5 @@
 package com.warycode.agent;
 
-import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.util.StrUtil;
 import com.warycode.agent.agent.CodingAgent;
 import com.warycode.agent.skill.Skill;
@@ -8,6 +7,8 @@ import com.warycode.agent.skill.SkillRegistry;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 /**
@@ -26,10 +27,11 @@ public final class Repl {
 
     /** 主循环，输入流结束或 /exit 时退出。 */
     public void run() throws IOException {
-        BufferedReader inputReader = new BufferedReader(IoUtil.getBomReader(System.in));
+        // 构造不预读 stdin(勿换 IoUtil.getBomReader: 其构造时做 BOM 探测会阻塞到首次输入, 提示符就打不出来)
+        BufferedReader inputReader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
         while (true) {
-            System.out.print("\n" + Ansi.teal("> "));
-            System.out.flush();
+            // println 自带换行: 按行渲染的 IDE 控制台也能立即显示提示符
+            System.out.print("\n" + Ansi.teal(">"));
 
             String line = inputReader.readLine();
             if (line == null) {

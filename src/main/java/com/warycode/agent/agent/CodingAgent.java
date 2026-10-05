@@ -1,5 +1,6 @@
 package com.warycode.agent.agent;
 
+import com.warycode.agent.Ansi;
 import com.warycode.agent.AgentConfig;
 import com.warycode.agent.llm.ChatClient;
 import com.warycode.agent.llm.model.AssistantMessage;
@@ -40,13 +41,15 @@ public final class CodingAgent {
         this.skillRegistry = skillRegistry;
     }
 
-    /** 执行一轮用户输入，循环执行工具调用，返回最终文本回复。 */
+    /** 执行轮：调 LLM → 执行工具调用并回填结果 → 直到模型返回文本。工具异常由执行器兜底。 */
     public String runTurn(String userInput) {
         if (history.isEmpty()) {
             history.add(new SystemMessage(systemPrompt()));
         }
         history.add(new UserMessage(userInput));
 
+        // 执行分隔线只在本轮首次工具调用前打一次：直接回答的轮次不产生多余横幅
+        boolean executionBannerPrinted = false;
         for (int i = 0; i < MAX_ITERATIONS; i++) {
             ChatRequest request = new ChatRequest(
                     config.model(), List.copyOf(history), toolRegistry.definitions());
@@ -55,6 +58,11 @@ public final class CodingAgent {
             history.add(new AssistantMessage(response.text(), response.toolCalls()));
             if (response.toolCalls().isEmpty()) {
                 return response.text() == null ? "(模型未返回内容)" : response.text();
+            }
+            if (!executionBannerPrinted) {
+                System.out.println();
+                System.out.println(Ansi.dim("  ========================== 执行 =========================="));
+                executionBannerPrinted = true;
             }
             for (ToolCall call : response.toolCalls()) {
                 ToolResult result = executor.execute(call);
