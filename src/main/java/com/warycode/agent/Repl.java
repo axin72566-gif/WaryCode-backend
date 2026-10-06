@@ -63,7 +63,8 @@ public final class Repl {
                 agent.clear();
                 System.out.println(Ansi.dim("(已清空对话)"));
             }
-            case "/help" -> System.out.println("/exit /quit 退出 | /clear 清空对话");
+            case "/history" -> System.out.println(Ansi.dim("(" + agent.historyStats() + ")"));
+            case "/help" -> System.out.println("/exit /quit 退出 | /clear 清空对话 | /history 查看历史占用");
             default -> System.out.println("未知命令: " + command + "，/help 查看可用命令");
         }
         return true;

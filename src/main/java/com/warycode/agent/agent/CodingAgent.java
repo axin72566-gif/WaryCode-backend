@@ -58,6 +58,7 @@ public final class CodingAgent {
                 ToolResult result = executor.execute(call);
                 history.add(new ToolMessage(call.id(), result.content(), result.isError()));
             }
+            HistoryTrimmer.trim(history);
         }
         return "(已达最大迭代 " + MAX_ITERATIONS + " 次，可继续输入引导我完成)";
     }
@@ -65,5 +66,31 @@ public final class CodingAgent {
     /** 清空对话历史，System prompt 下轮自动重建。 */
     public void clear() {
         history.clear();
+    }
+
+    /** /history 的观测数据：消息条数、字符量(UTF-16 近似)、工具结果完整/已省略分布。 */
+    public String historyStats() {
+        long chars = 0;
+        int tools = 0;
+        int elided = 0;
+        for (ChatMessage message : history) {
+            switch (message) {
+                case SystemMessage m -> chars += m.content().length();
+                case UserMessage m -> chars += m.content().length();
+                case AssistantMessage m -> {
+                    chars += m.text() == null ? 0 : m.text().length();
+                    for (ToolCall call : m.toolCalls()) {
+                        chars += call.argumentsJson() == null ? 0 : call.argumentsJson().length();
+                    }
+                }
+                case ToolMessage m -> {
+                    tools++;
+                    elided += HistoryTrimmer.isElided(m.content()) ? 1 : 0;
+                    chars += m.content().length();
+                }
+            }
+        }
+        return "历史 " + history.size() + " 条消息, 约 " + String.format("%.1f", chars / 1024.0) + " KB"
+                + " | 工具结果 " + tools + " 条: 完整 " + (tools - elided) + ", 已省略 " + elided;
     }
 }
