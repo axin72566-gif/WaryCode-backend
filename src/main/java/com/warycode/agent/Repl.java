@@ -2,11 +2,15 @@ package com.warycode.agent;
 
 import cn.hutool.core.util.StrUtil;
 import com.warycode.agent.agent.CodingAgent;
+import com.warycode.agent.hooks.HookEvent;
+import com.warycode.agent.hooks.HookOutcome;
+import com.warycode.agent.hooks.HookRunner;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 /**
  * 命令行交互循环：/ 开头的行按命令分发，其余作为任务交给 agent。
@@ -15,9 +19,11 @@ import java.nio.charset.StandardCharsets;
 public final class Repl {
 
     private final CodingAgent agent;
+    private final HookRunner hooks;
 
-    public Repl(CodingAgent agent) {
+    public Repl(CodingAgent agent, HookRunner hooks) {
         this.agent = agent;
+        this.hooks = hooks;
     }
 
     /** 主循环，输入流结束或 /exit 时退出。 */
@@ -63,8 +69,13 @@ public final class Repl {
         return true;
     }
 
-    /** 执行任务并打印回答；失败只报错不退出。 */
+    /** UserPromptSubmit hook → 执行任务并打印回答 → Stop hook(仅观察)；失败只报错不退出。 */
     private void runTask(String input) {
+        HookOutcome submit = hooks.fire(HookEvent.UserPromptSubmit, Map.of("prompt", input));
+        if (submit.blocked()) {
+            System.out.println("  " + Ansi.red("⊘ hook 拦截: ") + submit.reason());
+            return;
+        }
         try {
             String answer = agent.runTurn(input);
             System.out.println();
@@ -73,8 +84,15 @@ public final class Repl {
             System.out.println(answer);
             System.out.println();
             System.out.println(Ansi.dim("  ========================== 回答 =========================="));
+
+            HookOutcome stop = hooks.fire(HookEvent.Stop, Map.of());
+            if (stop.blocked()) {
+                // v1 的 Stop 无阻断能力(需改 CodingAgent 循环)，只把意见亮出来
+                System.out.println("  " + Ansi.dim("[hook] Stop 被拦截(v1 仅提示): ") + stop.reason());
+            }
         } catch (Exception e) {
             System.out.println(Ansi.red("[LLM 调用失败] ") + StrUtil.blankToDefault(e.getMessage(), e.toString()));
         }
     }
+
 }

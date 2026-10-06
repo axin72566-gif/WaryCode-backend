@@ -6,12 +6,17 @@ import com.warycode.agent.llm.openai.OpenAiChatClient;
 import com.warycode.agent.skills.Skill;
 import com.warycode.agent.skills.SkillLoader;
 import com.warycode.agent.skills.SkillRegistry;
+import com.warycode.agent.hooks.HookEvent;
+import com.warycode.agent.hooks.HookLoader;
+import com.warycode.agent.hooks.HookOutcome;
+import com.warycode.agent.hooks.HookRunner;
 import com.warycode.agent.tools.ToolExecutor;
 import com.warycode.agent.tools.ToolRegistry;
 import com.warycode.agent.tools.impl.SkillTool;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Map;
 
 /** 入口：装配组件并启动 REPL。 */
 public final class Main {
@@ -27,7 +32,8 @@ public final class Main {
         if (!skillRegistry.names().isEmpty()) {
             toolRegistry.register(new SkillTool(skillRegistry));
         }
-        ToolExecutor executor = new ToolExecutor(toolRegistry);
+        HookRunner hooks = new HookRunner(new HookLoader().load(), workspace);
+        ToolExecutor executor = new ToolExecutor(toolRegistry, hooks);
 
         String systemPrompt = """
                 你是运行在用户本机的编码 agent。工作目录: %s（只能访问其中文件）。
@@ -65,9 +71,18 @@ public final class Main {
         if (!skillRegistry.names().isEmpty()) {
             System.out.printf("  %s %s%n", Ansi.dim(String.format("%-10s", "skills")), String.join(", ", skillRegistry.names()));
         }
+        if (!hooks.isEmpty()) {
+            System.out.printf("  %s %s%n", Ansi.dim(String.format("%-10s", "hooks")), hooks.summary());
+        }
         System.out.println();
         System.out.println(Ansi.dim("  输入任务开始; /help 查看命令"));
 
-        new Repl(agent).run();
+        // 横幅后触发 SessionStart；exit 2 无阻断语义，只把意见亮出来
+        HookOutcome start = hooks.fire(HookEvent.SessionStart, Map.of());
+        if (start.blocked()) {
+            System.out.println("  " + Ansi.red("[hook] SessionStart 被拦截(仅提示): ") + start.reason());
+        }
+
+        new Repl(agent, hooks).run();
     }
 }

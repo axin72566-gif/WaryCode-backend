@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "command": "java scripts/hooks/GitGuard.java",
+        "timeout": 20,
+        "onFailure": "block"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "writeFile|editFile",
+        "command": "java scripts/hooks/CompileCheck.java",
+        "timeout": 180
+      }
+    ]
+  }
+}
