@@ -43,6 +43,10 @@ public final class EditFileTool implements Tool {
         String rawPath = args.get("path").toString();
         Path file = workspace.resolve(rawPath).normalize();
         if (!file.startsWith(workspace)) throw new IllegalArgumentException("路径越界(仅允许工作目录内): " + rawPath);
+        // hooks.json/config.properties 是 hook 与密钥配置: 禁 agent 写入防提示注入持久化，用户手动编辑不受限
+        if (file.equals(workspace.resolve("hooks.json")) || file.equals(workspace.resolve("config.properties"))) {
+            throw new IllegalArgumentException("受保护文件(hook/密钥配置)不允许 agent 修改，请让用户手动编辑: " + rawPath);
+        }
 
         String originalContent = Files.readString(file, StandardCharsets.UTF_8);
         String oldString = args.get("old_string").toString();
